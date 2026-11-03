@@ -1248,7 +1248,22 @@ function splitShare(text) {
   return { url, name: rest.length <= 80 ? rest : '' };
 }
 const urlIn = s => splitShare(s).url;
-async function resolveMapLink(url) { const p = parseLoc(url); return p && p !== 'short' ? p : null; }
+function nameInUrl(url) {
+  try { const u = new URL(url), m = u.pathname.match(/\/maps\/place\/([^/@]+)/); let n = m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : (u.searchParams.get('q') || u.searchParams.get('query') || ''); n = n.trim(); return n && !/^-?\d+(\.\d+)?[,\s]/.test(n) ? n.slice(0, 120) : ''; } catch (e) { return ''; }
+}
+// geeft {lat,lon,name} of null; volgt korte links via de Supabase-functie, met zoeken op naam als terugval
+async function resolveMapLink(url) {
+  const p = parseLoc(url); if (p && p !== 'short') return { lat: p.lat, lon: p.lon, name: nameInUrl(url) };
+  let name = nameInUrl(url);
+  try {
+    const call = window.__FN ? window.__FN(url) : S.sb.functions.invoke('resolve-map-link', { body: { url } });
+    const r = await call, d = r && r.data;
+    if (d && d.ok && isFinite(d.lat) && isFinite(d.lon)) return { lat: +d.lat, lon: +d.lon, name: d.name || name };
+    if (d && d.name) name = d.name;
+  } catch (e) {}
+  if (name) { try { const f = (await searchPlaces(name))[0]; if (f) return { lat: f.lat, lon: f.lon, name }; } catch (e) {} }
+  return null;
+}
 let repaired = false;
 async function repairSpots() {
   if (repaired || !writable()) return; repaired = true;
@@ -1258,8 +1273,8 @@ async function repairSpots() {
     try {
       const url = s.link || urlIn(s.place) || urlIn(s.notes) || urlIn(s.title), sh = splitShare(s.place || ''), r = await resolveMapLink(url), patch = {};
       if (!s.link) patch.link = url;
-      if (r) { patch.lat = r.lat; patch.lon = r.lon; fixed++; }
-      if (urlIn(s.place)) patch.place = sh.name || (r ? (await reverseName(r.lat, r.lon)) : '') || 'Google Maps-locatie';
+      if (r) { patch.lat = r.lat; patch.lon = r.lon; fixed++; }  
+      if (urlIn(s.place)) patch.place = sh.name || (r && r.name) || (r ? (await reverseName(r.lat, r.lon)) : '') || 'Google Maps-locatie';
       if (Object.keys(patch).length) await S.db.doc('spots/' + s.id).update(patch);
     } catch (e) {}
   }
@@ -1336,8 +1351,16 @@ function openPicker(O) {
     const q = e.target.value.trim(), box = el.querySelector('#pksugs'), seq = ++pseq; clearTimeout(pt); box.innerHTML = '';
     const sh = splitShare(q), pl = parseLoc(sh.url || q);
     if (pl && pl !== 'short') { P.lat = pl.lat; P.lon = pl.lon; P.z = 15; setPin(pl.lat, pl.lon, sh.name || null); return; }
-    if (pl === 'short') { box.innerHTML = '<div class="hint err">Korte Google-links kan ik niet lezen. ' + (sh.name ? 'Ik zoek op de naam.' : 'Zoek op naam of tik op de kaart.') + '</div>'; if (!sh.name) return; }
-    const qq = pl === 'short' ? sh.name : q; if (qq.length < 3) return;
+    if (pl === 'short') {
+      box.innerHTML = '<div class="hint">Link volgen…</div>';
+      resolveMapLink(sh.url || q).then(r => {
+        if (seq !== pseq) return;
+        if (r) { box.innerHTML = ''; P.lat = r.lat; P.lon = r.lon; P.z = 15; setPin(r.lat, r.lon, sh.name || r.name || null); }
+        else box.innerHTML = '<div class="hint err">Deze link kan ik niet openen. Zoek op naam of tik op de kaart.</div>';
+      });
+      return;
+    }
+    const qq = q; if (qq.length < 3) return;
     const loc = matches(qq).slice(0, 3).map(p => ({ label: p.name, lat: p.lat, lon: p.lon }));
     const show = list => { box.innerHTML = list.map((s, i) => '<button data-i="' + i + '">' + esc(s.label) + '</button>').join(''); box._list = list; };
     show(loc);
