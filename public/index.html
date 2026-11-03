@@ -1088,6 +1088,7 @@ function evHTML(e) {
 
 /* ---------- sheets ---------- */
 function openSheet(html, kind, id) {
+  if (!$('#sheet .sheet')) pushStep();
   S.sheetKind = kind || ''; S.sheetId = id || null;
   $('#sheet').innerHTML = '<div class="scrim" data-act="scrim"><div class="sheet" role="dialog">' + html + '</div></div>';
 }
@@ -1271,6 +1272,7 @@ const ilon = (x, z) => x / (Math.pow(2, z) * TILE) * 360 - 180;
 const ilat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / (Math.pow(2, z) * TILE); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
 function openPicker() {
   const F = S.F; if (!F || $('.picker')) return;
+  pushStep();
   const el = document.createElement('div'); el.className = 'picker';
   el.innerHTML = '<div class="pkbar"><button class="pkx" data-pk="close" aria-label="Terug">←</button><input id="pksearch" placeholder="Zoek een plaats of adres…" autocomplete="off"><div class="pksugs" id="pksugs"></div></div>' +
     '<div class="pkmap" id="pkmap"><div class="pkpin" id="pkpin" hidden>📍</div><div class="pkctl"><button data-pk="zin" aria-label="Inzoomen">+</button><button data-pk="zout" aria-label="Uitzoomen">−</button><button data-pk="gps" aria-label="Mijn locatie">⌖</button></div><div class="pkattr">© OpenStreetMap</div></div>' +
@@ -1384,6 +1386,7 @@ async function deleteSpot(id) {
   } catch (e) { dbFail(e); }
 }
 function openGallery(items, start) {
+  if (!$('.lightbox')) pushStep();
   const old = $('.lightbox'); if (old) old.remove();
   const el = document.createElement('div'); el.className = 'lightbox';
   el.innerHTML = '<div class="lbtrack">' + items.map(p => '<div class="lbslide"><img alt="" src="' + esc(p.data) + '"></div>').join('') + '</div><button class="lbclose" aria-label="Sluiten">✕</button>' +
@@ -1833,7 +1836,7 @@ document.addEventListener('submit', e => { if (e.target.id === 'reqform') { e.pr
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-req]'); if (!a) return;
   switch (a.dataset.req) {
-    case 'open': showRequest(); break;
+    case 'open': pushStep(); showRequest(); break;
     case 'back': case 'done': closeRequest(); break;
     case 'day': pickDay(a.dataset.d); break;
     case 'mprev': R.m--; if (R.m < 0) { R.m = 11; R.y--; } drawRcal(); break;
@@ -1934,26 +1937,32 @@ window.addEventListener('resize', () => { if (S.tab === 'map' && $('#mapwrap')) 
 /* ---------- terug-knop en veegbeweging: naar het vorige scherm ---------- */
 S.tabHist = [];
 function goTab(t, fromBack) {
-  if (!fromBack && S.tab !== t) { S.tabHist.push(S.tab); if (S.tabHist.length > 30) S.tabHist.shift(); }
+  if (!fromBack && S.tab !== t) { S.tabHist.push(S.tab); if (S.tabHist.length > 30) S.tabHist.shift(); pushStep(); }
   S.tab = t; if (t === 'map') M.fitted = false; renderView(); renderNav();
 }
 function handleBack() {
   const lb = $('.lightbox'); if (lb) { lb.remove(); return true; }
   const pk = $('.picker'); if (pk) { pk.remove(); return true; }
-  if (S.sheetKind) { closeSheet(); return true; }
+  if ($('#sheet .sheet')) { closeSheet(); return true; }
   if ($('#reqform')) { closeRequest(); return true; }
   if (S.db && S.tabHist.length) { goTab(S.tabHist.pop(), true); return true; }
   if (S.db && S.tab !== 'home') { goTab('home', true); return true; }
   return false;
 }
-// De browser houdt steeds één stap "voor" op de app. Drukt iemand op terug, dan sluiten we eerst het bovenste scherm
-// en zetten die stap weer vooraan. Pas op het beginscherm laten we de browser echt terug gaan.
+// Elke stap vooruit (ander tabblad, venster, kaartkiezer, foto) zet bij de tik een stap in de geschiedenis van de browser.
+// Zo telt de terug-knop van de gsm die stappen mee, en sluit de app niet meteen. (Stappen die de pagina zelf zonder tik
+// toevoegt, slaat Chrome over; daarom gebeurt dit altijd direct bij een tik.) Sluit je iets met een knop, dan blijft de
+// stap in de geschiedenis staan; die wordt bij terug stilletjes overgeslagen tot je echt de app verlaat.
+let NAVI = 0;
+function pushStep() { try { NAVI++; history.pushState({ i: NAVI }, '', location.href); } catch (e) {} }
 try {
-  const st = history.state && history.state.cd;
-  if (st !== 1) { if (st !== 0) history.replaceState({ cd: 0 }, '', location.href); history.pushState({ cd: 1 }, '', location.href); }
-  window.addEventListener('popstate', () => {
-    if (history.state && history.state.cd === 1) return;
-    if (handleBack()) { try { history.pushState({ cd: 1 }, '', location.href); } catch (e) {} } else { try { history.back(); } catch (e) {} }
+  NAVI = (history.state && history.state.i) || 0;
+  if (!history.state || history.state.i == null) history.replaceState({ i: 0 }, '', location.href);
+  window.addEventListener('popstate', e => {
+    const ni = (e.state && e.state.i) || 0;
+    if (ni >= NAVI) { NAVI = ni; return; }
+    NAVI = ni;
+    if (!handleBack()) { try { history.back(); } catch (x) {} }
   });
 } catch (e) {}
 
