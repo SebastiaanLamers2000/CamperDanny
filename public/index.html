@@ -1,0 +1,1965 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5efe3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14191a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Camper Danny">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Camper Danny</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+/* layout: één schermvullende app; vijf tabs onderaan (Start, Kaart, Tijdlijn, Agenda, To-do), de actieve pagina erboven */
+:root{
+  --bg:#f5efe3; --surface:#fffcf5; --ink:#232b27; --muted:#6b756f; --line:#e3dac6;
+  --accent:#1d6b64; --accent-ink:#ffffff; --orange:#d9742b; --violet:#7a6fa8; --green:#5b8f4a;
+  --sea:#cfe2e4; --land:#eadfc6; --land-line:#c9bb98; --border:#a8986f; --danger:#b3392f; --shadow:0 6px 24px rgba(40,34,20,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#14191a; --surface:#1d2425; --ink:#e8ece7; --muted:#97a39c; --line:#2c3638;
+    --accent:#4fb3a8; --accent-ink:#0c1514; --orange:#ef9250; --violet:#a198d6; --green:#86bb73;
+    --sea:#1a2a2f; --land:#2b332f; --land-line:#44504a; --border:#6d7c73; --danger:#e8675c; --shadow:0 6px 24px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#14191a; --surface:#1d2425; --ink:#e8ece7; --muted:#97a39c; --line:#2c3638;
+  --accent:#4fb3a8; --accent-ink:#0c1514; --orange:#ef9250; --violet:#a198d6; --green:#86bb73;
+  --sea:#1a2a2f; --land:#2b332f; --land-line:#44504a; --border:#6d7c73; --danger:#e8675c; --shadow:0 6px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+h1,h2,h3{font-family:"Fraunces",Georgia,"Times New Roman",serif;margin:0;font-weight:700;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px 10px;border-bottom:1px solid var(--line);background:var(--bg)}
+header .ttl{flex:1;min-width:0}
+header h1{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .sub{font-size:12px;color:var(--muted)}
+.kmbadge{text-align:right;line-height:1.1}
+.kmbadge b{font-family:"Fraunces",Georgia,serif;font-size:22px;color:var(--accent)}
+.kmbadge span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.iconbtn{border:1px solid var(--line);background:var(--surface);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px}
+#main{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+.scroll{flex:1;overflow-y:auto;padding:14px 16px 96px;-webkit-overflow-scrolling:touch}
+nav{display:flex;border-top:1px solid var(--line);background:var(--surface)}
+nav button{flex:1;border:0;background:none;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--muted)}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--accent);font-weight:600}
+.fab{position:absolute;right:16px;bottom:16px;z-index:5;border:0;background:var(--accent);color:var(--accent-ink);height:52px;padding:0 20px;border-radius:26px;font-weight:600;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px;font-size:15px}
+.fab svg{width:20px;height:20px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round}
+
+/* map */
+#mapwrap{flex:1;position:relative;overflow:hidden;touch-action:none;background:var(--sea);cursor:grab}
+#mapsvg{width:100%;height:100%;display:block}
+.land{fill:var(--land);stroke:var(--land-line);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.bord{fill:none;stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
+.clab{fill:var(--muted);stroke:var(--land);paint-order:stroke;stroke-linejoin:round;pointer-events:none;font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-weight:600;opacity:.85}
+.city{fill:var(--ink);stroke:var(--land);paint-order:stroke;stroke-linejoin:round;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.city.t1{font-weight:700}.city.t3,.city.t4{fill:var(--muted)}
+.cdot{fill:var(--ink);stroke:var(--land);opacity:.75}
+.mapchips{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none;max-width:calc(100% - 70px)}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.chip b{color:var(--accent)}
+.mapctl{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.mapctl button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.mapcard{position:absolute;left:12px;bottom:14px;right:96px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;box-shadow:var(--shadow)}
+.mapcard h3{font-size:16px}
+.mapcard .m{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
+.mapnote{position:absolute;left:12px;bottom:6px;font-size:10.5px;color:var(--muted);opacity:.9;pointer-events:none}
+.mapempty{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;max-width:78%;box-shadow:var(--shadow)}
+.mapempty p{margin:4px 0 0;color:var(--muted);font-size:13px}
+
+/* timeline */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 6px;text-align:center}
+.stat b{display:block;font-family:"Fraunces",Georgia,serif;font-size:19px;color:var(--accent)}
+.stat span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.year{font-family:"Fraunces",Georgia,serif;font-size:13px;color:var(--muted);letter-spacing:.12em;margin:16px 0 8px 2px}
+.tl{position:relative;padding-left:22px}
+.tl::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line);border-radius:2px}
+.tcard{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-bottom:12px;width:100%;text-align:left;display:block}
+.tcard::before{content:"";position:absolute;left:-22px;top:16px;width:14px;height:14px;border-radius:50%;background:var(--c,var(--accent));border:3px solid var(--bg);box-sizing:content-box;margin-left:-3px}
+.tcard h3{font-size:17px}
+.tmeta{font-size:12.5px;color:var(--muted);margin:3px 0 7px}
+.pills{display:flex;flex-wrap:wrap;gap:5px}
+.pill{font-size:12px;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent)}
+.pill.km{background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--orange);border-color:color-mix(in srgb,var(--orange) 30%,transparent)}
+.thumbrow{display:flex;gap:6px;margin-top:9px}
+.thumbrow img{width:62px;height:62px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+.empty{text-align:center;color:var(--muted);padding:36px 20px}
+.empty b{display:block;color:var(--ink);font-family:"Fraunces",Georgia,serif;font-size:18px;margin-bottom:4px}
+
+/* calendar */
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.calhead h2{font-size:19px;text-transform:capitalize}
+.calhead .iconbtn{width:34px;height:34px}
+.dow,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dow span{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;padding:2px 0}
+.cell{border:1px solid var(--line);background:var(--surface);border-radius:9px;min-height:56px;padding:4px 3px 3px;display:flex;flex-direction:column;align-items:stretch;gap:3px;text-align:left}
+.cell.out{opacity:.4}
+.cell.today .dn{background:var(--accent);color:var(--accent-ink);border-radius:50%;width:20px;height:20px;display:grid;place-items:center}
+.cell.sel{outline:2px solid var(--accent);outline-offset:-1px}
+.dn{font-size:12px;font-weight:600;padding-left:3px;height:20px;line-height:20px}
+.bar{height:5px;border-radius:3px;background:var(--c)}
+.more{font-size:9.5px;color:var(--muted);padding-left:2px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--muted);margin:10px 2px 4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.sec{font-family:"Fraunces",Georgia,serif;font-size:15px;margin:16px 2px 8px}
+.ev{display:flex;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;width:100%;text-align:left}
+.ev .dot{width:10px;border-radius:5px;background:var(--c);flex:none}
+.ev h4{margin:0;font-size:14.5px}
+.ev .m{font-size:12.5px;color:var(--muted)}
+.ev .n{font-size:12.5px;margin-top:3px}
+
+/* start */
+.next{background:var(--accent);color:var(--accent-ink);border:0;border-radius:16px;padding:14px 15px;margin-bottom:12px;width:100%;text-align:left;display:block}
+.next .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;opacity:.85}
+.next h3{font-size:20px;margin:3px 0 2px;color:inherit;overflow-wrap:anywhere}
+.next .m{font-size:13px;opacity:.92}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:14px;min-height:118px;min-width:0}
+.tile svg{width:30px;height:30px;stroke:var(--accent);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tile b{font-family:"Fraunces",Georgia,serif;font-size:18px;display:block}
+.tile .s{font-size:12.5px;color:var(--muted);display:block;overflow-wrap:anywhere}
+.tile.alert svg{stroke:var(--danger)}
+.tile.alert .s{color:var(--danger)}
+.quick{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+/* to-do */
+.stats.three{grid-template-columns:repeat(3,1fr)}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px;margin-bottom:10px}
+.seg button{flex:1;border:0;background:none;border-radius:999px;padding:7px 8px;font-size:13.5px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.cats button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 11px;font-size:13px}
+.cats button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.todo{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 11px;margin-bottom:8px}
+.chk{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--bg);display:grid;place-items:center;padding:0}
+.chk svg{width:16px;height:16px;stroke:var(--bg);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.todo.done .chk{background:var(--green);border-color:var(--green)}
+.todo.done .chk svg{opacity:1}
+.tbody{flex:1;min-width:0;border:0;background:none;text-align:left;padding:0;display:block}
+.tbody h4{margin:0;font-size:15px;overflow-wrap:anywhere}
+.todo.done h4{text-decoration:line-through;color:var(--muted)}
+.tbody .m{font-size:12.5px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.tbody .n{font-size:13px;margin-top:4px;overflow-wrap:anywhere}
+.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 32%,transparent)}
+
+/* aanmelden en leden */
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+[hidden]{display:none!important}
+.authwrap{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:calc(48px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px))}
+.authcard{width:100%;max-width:380px}
+.authcard h1{font-size:30px;margin-bottom:6px;text-wrap:balance}
+.authcard p{color:var(--muted);margin:0 0 6px}
+.authcard label{display:block;margin-top:12px}
+.iconbtn{position:relative}
+.badge{position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;background:var(--orange);border:2px solid var(--bg)}
+.member{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.member .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.member select{width:auto;max-width:58%}
+
+/* huuraanvragen */
+nav button{position:relative}
+.navdot{position:absolute;top:6px;left:calc(50% + 7px);width:10px;height:10px;border-radius:50%;background:var(--orange);border:2px solid var(--surface)}
+.authcard.wide{max-width:440px}
+.back{border:0;background:none;color:var(--accent);font-weight:600;padding:6px 0;margin:0 0 8px -2px;font-size:15px}
+.primary.big{width:100%;padding:17px 18px;font-size:17px;border-radius:14px}
+.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:26px 0 6px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.hp{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.fine{font-size:12px;color:var(--muted);margin:10px 0 0}
+.hint.ok{color:var(--ink);font-weight:600}
+.rgrid{gap:3px}
+.rd{aspect-ratio:1;min-height:40px;border:1px solid var(--line);background:var(--surface);border-radius:9px;font-size:14px;display:grid;place-items:center;padding:0;color:var(--ink)}
+.rd.blank{visibility:hidden;border:0}
+.rd.off{opacity:.35}
+.rd.busy{background:repeating-linear-gradient(135deg,transparent 0 4px,color-mix(in srgb,var(--muted) 35%,transparent) 4px 6px);color:var(--muted);text-decoration:line-through;border-color:var(--line)}
+.rd.today{outline:1.5px solid var(--accent);outline-offset:-2px}
+.rd.mid{background:color-mix(in srgb,var(--accent) 20%,var(--surface));border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.rd.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.rd:focus-visible,.back:focus-visible,.primary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.legend i.hatch{background:repeating-linear-gradient(135deg,transparent 0 2px,color-mix(in srgb,var(--muted) 60%,transparent) 2px 3px);border:1px solid var(--line)}
+.next.reqcard{background:var(--orange);color:#1f1408}
+.seg .cnt{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--orange);color:#1f1408;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.rq{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-bottom:10px}
+.rqh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rqh h4{margin:0;font-size:16px;min-width:0;overflow-wrap:anywhere}
+.rq .m{font-size:12.5px;color:var(--muted);margin-top:3px}
+.rq .n{font-size:13px;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.rqc{font-size:13.5px;margin-top:4px;overflow-wrap:anywhere}
+.rqc a{color:var(--accent)}
+.rq .actions{margin-top:12px}
+
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(10,14,12,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;max-height:92%;overflow-y:auto;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:var(--shadow)}
+.sheet h2{font-size:21px;margin-bottom:12px}
+.sheet label,.sheet .field{display:block;margin-bottom:12px}
+.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+input:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:0}
+textarea{min-height:70px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:10px;margin-top:16px}
+.actions button{flex:1}
+.primary,.ghost,.danger,.small{border-radius:12px;padding:12px 14px;border:1px solid var(--line);font-weight:600}
+.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.primary:disabled{opacity:.55}
+.ghost{background:transparent}
+.danger{background:transparent;color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,transparent)}
+.small{padding:6px 11px;font-size:13px;background:var(--bg);font-weight:500}
+.stoprow{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.stoprow .num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.stoprow .nm{flex:1;min-width:0}
+.stoprow .nm small{display:block;color:var(--muted);font-size:11px}
+.stoprow button{border:0;background:none;color:var(--muted);font-size:18px;padding:2px 6px}
+.addstop{display:flex;gap:8px}
+.addstop button{white-space:nowrap}
+.sugs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sugs button,.mini button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 11px;font-size:13px}
+.mini{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.hint.err{color:var(--danger)}
+.warn{background:color-mix(in srgb,var(--orange) 14%,transparent);border:1px solid color-mix(in srgb,var(--orange) 40%,transparent);border-radius:10px;padding:9px 11px;font-size:13px;margin-top:10px}
+details{margin-top:8px;font-size:13px}
+details summary{color:var(--muted);cursor:pointer}
+.photos{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.ph{position:relative;width:76px;height:76px}
+.ph img{width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.ph button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:var(--danger);color:#fff;font-size:13px;line-height:1}
+.ph.gone img{opacity:.25}
+.filebtn{display:inline-block;border:1px dashed var(--accent);color:var(--accent);padding:9px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+.kinds{display:flex;gap:6px;flex-wrap:wrap}
+.kinds button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 12px;font-size:13.5px}
+.kinds button.on{background:var(--c);color:var(--bg);border-color:var(--c)}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.dgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
+.kv{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.notes{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10px 12px;margin:8px 0}
+.lightbox{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.94)}
+.lbtrack{display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.lbtrack::-webkit-scrollbar{display:none}
+.lbslide{flex:0 0 100%;height:100%;scroll-snap-align:center;scroll-snap-stop:always;display:grid;place-items:center;padding:56px 10px}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px;object-fit:contain}
+.lbclose,.lbnav{position:absolute;border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:50%;width:42px;height:42px;font-size:22px;line-height:1;display:grid;place-items:center;cursor:pointer}
+.lbclose{top:12px;right:12px}
+.lbnav{top:50%;transform:translateY(-50%);font-size:30px;padding-bottom:3px}.lbnav.prev{left:10px}.lbnav.next{right:10px}
+@media (hover:none){.lbnav{display:none}}
+.lbcount{position:absolute;top:20px;left:0;right:0;text-align:center;color:#fff;font-size:14px;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.spot{display:flex;gap:11px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:9px;margin-bottom:9px;color:inherit}
+.spot img,.spot .noimg{width:88px;height:88px;flex:none;border-radius:10px;object-fit:cover;border:1px solid var(--line)}
+.spot .noimg{display:grid;place-items:center;font-size:30px;background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.spot .sb{min-width:0;flex:1}.spot h4{margin:0 0 2px;font-size:15.5px}.spot .m{font-size:12.5px;color:var(--muted);margin-top:2px}
+.spot .n{font-size:13px;color:var(--ink);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.heart{color:var(--danger)}
+.locbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+.locbtn .lt{font-weight:600;font-size:15px}.locbtn .ls{font-size:12.5px;color:var(--muted)}
+.sugs.vert{flex-direction:column;align-items:stretch;gap:4px}.sugs.vert button{text-align:left;border-radius:10px;padding:9px 12px;font-size:14px;background:var(--surface)}
+.linkbtn+.linkbtn{margin-top:8px}
+.picker{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column}
+.pkbar{position:relative;display:flex;gap:8px;padding:10px;background:var(--surface);border-bottom:1px solid var(--line);z-index:3}
+.pkbar input{flex:1;min-width:0}.pkx{border:1px solid var(--line);background:var(--bg);border-radius:10px;width:42px;font-size:20px}
+.pksugs{position:absolute;left:10px;right:10px;top:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.pksugs:empty{display:none}.pksugs button{text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:11px 12px;font-size:14px}.pksugs .hint{padding:10px 12px}
+.pkmap{flex:1;position:relative;overflow:hidden;touch-action:none;background:#e6e2d8;cursor:crosshair}
+.pkmap img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.pkpin{position:absolute;font-size:32px;line-height:1;transform:translate(-50%,-92%);pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+.pkctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.pkctl button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.pkattr{position:absolute;left:6px;bottom:4px;font-size:10.5px;background:rgba(255,255,255,.75);color:#333;padding:1px 5px;border-radius:4px;pointer-events:none}
+.pkfoot{display:flex;align-items:center;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line)}
+.pkfoot span{flex:1;font-size:13px;color:var(--muted)}
+.favbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px;font-size:14px;font-weight:600}
+.favbtn.on{background:color-mix(in srgb,var(--danger) 12%,transparent);border-color:var(--danger);color:var(--danger)}
+.linkbtn{display:flex;align-items:center;justify-content:center;margin-top:14px;padding:11px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--accent);font-weight:600;background:var(--surface)}
+.tile.wide{grid-column:1/-1;min-height:0;flex-direction:row;align-items:center;justify-content:flex-start;gap:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:90;font-size:13.5px;box-shadow:var(--shadow);max-width:88%;text-align:center}
+.banner{margin:10px 16px 0;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--orange) 14%,transparent);border:1px solid color-mix(in srgb,var(--orange) 35%,transparent);font-size:13px}
+.roles{font-size:13px;color:var(--muted);background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:6px}
+.roles b{color:var(--ink)}
+</style>
+</head>
+<body>
+<header id="hdr"></header>
+<div id="banner"></div>
+<div id="main"><div id="view" style="display:flex;flex-direction:column;flex:1;min-height:0"></div><div id="fabslot"></div></div>
+<nav id="nav"></nav>
+<div id="sheet"></div>
+<div id="toast"></div>
+<div id="auth"></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.113.0/dist/umd/supabase.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ---------- helpers ---------- */
+const K = 0.62; // lon -> x schaal (benadering voor Europa)
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const dayOf = s => s ? String(s).slice(0, 10) : '';
+const diffDays = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const fmtNum = n => Math.round(n).toLocaleString('nl-BE');
+const eur = n => '€ ' + (+n).toLocaleString('nl-BE', { maximumFractionDigits: 2 });
+const todayStr = () => ymd(new Date());
+function fmtDate(s, withTime) {
+  if (!s) return '';
+  const d = new Date(s.length <= 10 ? s + 'T00:00:00' : s);
+  if (isNaN(d)) return '';
+  const o = { day: 'numeric', month: 'short', year: 'numeric' };
+  if (withTime && s.length > 10) { o.hour = '2-digit'; o.minute = '2-digit'; }
+  return d.toLocaleString('nl-BE', o);
+}
+function fmtRange(a, b, withTime) {
+  if (!a) return '';
+  if (!b || dayOf(a) === dayOf(b)) return fmtDate(a, withTime) + (b && withTime && a !== b ? ' → ' + new Date(b).toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}) : '');
+  return fmtDate(a, withTime) + ' → ' + fmtDate(b, withTime);
+}
+function nightsOf(t) { return t.start && t.end ? Math.max(0, diffDays(dayOf(t.start), dayOf(t.end))) : 0; }
+
+/* ---------- kaartdata (vereenvoudigde contouren, lon,lat) ---------- */
+const LAND = [
+// vasteland Europa + Scandinavië
+"-5.35,36.1 -4.4,36.7 -3.5,36.75 -2.2,36.75 -1.6,37.2 -0.7,37.6 -0.2,38.4 0.2,38.75 -0.3,39.5 0.0,39.95 0.9,40.7 1.2,41.1 2.2,41.4 3.2,41.9 3.3,42.3 3.1,43.0 3.9,43.5 4.8,43.4 5.4,43.3 6.2,43.1 7.0,43.55 7.5,43.8 8.2,44.0 8.9,44.4 9.8,44.1 10.3,43.6 10.5,42.9 11.1,42.4 11.9,41.9 12.9,41.3 13.8,41.2 14.3,40.8 15.0,40.1 15.7,39.9 16.0,39.2 15.9,38.7 15.65,38.0 16.05,37.95 16.55,38.7 17.1,39.05 16.5,39.75 17.2,40.45 18.35,39.8 18.5,40.15 17.95,40.65 16.85,41.1 16.2,41.9 15.0,42.0 14.2,42.45 13.6,43.6 12.6,44.1 12.3,44.9 12.4,45.4 13.75,45.65 13.6,45.2 13.85,44.85 14.4,45.33 14.9,44.99 15.2,44.1 15.9,43.7 16.4,43.5 17.0,43.3 18.1,42.65 18.7,42.4 19.1,42.1 19.6,41.8 19.45,41.3 19.45,40.45 20.0,39.65 20.4,39.3 20.75,38.95 21.4,38.3 21.75,38.25 21.1,37.9 21.6,36.9 22.45,36.4 23.05,36.7 22.8,37.55 23.15,37.65 23.0,37.9 23.65,37.95 24.0,37.65 24.0,38.15 23.6,38.45 22.95,39.35 22.65,40.0 22.95,40.6 23.4,39.95 23.9,39.95 24.35,40.15 24.0,40.55 24.4,40.9 25.9,40.85 26.2,40.0 26.75,40.4 27.5,40.97 28.9,41.0 29.1,41.2 28.1,41.6 27.5,42.5 27.95,43.2 28.65,44.2 29.7,45.2 30.7,46.5 32.0,46.5 33.0,46.1 45,46.1 45,69.5 33.5,69.3 31.1,70.1 29.0,70.9 27.0,71.05 25.8,71.15 23.8,70.75 21.0,70.3 19.5,70.15 19.0,69.65 17.5,69.2 16.0,68.7 14.7,68.2 14.0,67.7 14.4,67.25 13.0,66.0 12.4,65.4 11.2,64.6 10.0,63.6 8.8,63.5 7.7,63.1 6.1,62.5 5.0,61.6 5.2,60.4 5.2,59.4 5.6,58.9 6.0,58.45 7.05,58.0 8.0,58.15 8.8,58.45 9.6,58.9 10.5,59.4 10.7,59.9 11.2,59.0 11.9,57.7 12.85,56.65 12.7,56.05 13.0,55.6 13.2,55.35 14.2,55.4 14.85,56.15 15.6,56.15 16.35,56.65 16.65,57.75 16.9,58.5 17.0,58.75 18.7,59.35 18.7,59.75 18.4,60.25 17.2,60.65 17.1,61.3 17.3,62.4 18.0,62.65 18.7,63.3 20.3,63.8 21.0,64.7 22.15,65.55 24.15,65.8 25.4,65.0 24.5,64.7 23.1,63.85 21.6,63.1 21.5,61.5 21.4,61.1 22.2,60.4 23.0,59.8 24.95,60.15 25.7,60.35 26.95,60.45 28.7,60.7 30.25,59.95 28.0,59.45 24.75,59.45 23.5,58.95 24.5,58.35 24.35,57.85 24.1,57.0 21.6,57.4 21.0,56.5 21.1,55.7 19.9,54.65 18.65,54.35 18.85,54.6 17.55,54.75 16.4,54.45 15.55,54.2 14.25,53.9 13.6,54.4 13.1,54.3 12.1,54.15 11.4,54.0 10.85,53.95 10.15,54.4 9.45,54.8 9.4,55.05 9.55,55.5 9.6,55.7 10.25,56.1 10.9,56.4 10.6,57.75 8.6,57.1 8.1,56.0 8.4,55.5 8.55,55.1 8.9,54.5 8.85,54.1 8.7,53.9 8.55,53.55 8.1,53.55 7.2,53.35 6.9,53.35 4.75,52.95 4.5,52.37 4.1,51.98 3.55,51.5 3.35,51.35 2.9,51.23 2.35,51.05 1.85,50.95 1.6,50.7 1.35,50.05 1.1,49.95 0.35,49.75 0.1,49.5 -0.4,49.35 -1.0,49.4 -1.6,49.65 -1.85,49.4 -1.5,48.6 -2.0,48.65 -2.3,48.7 -3.4,48.8 -4.0,48.7 -4.7,48.4 -4.75,48.05 -3.9,47.85 -3.4,47.7 -3.1,47.5 -2.2,47.25 -2.2,46.95 -1.8,46.5 -1.15,46.15 -1.1,45.6 -1.25,44.65 -1.55,43.5 -2.0,43.35 -3.0,43.4 -3.8,43.45 -4.75,43.4 -5.65,43.55 -7.05,43.55 -8.4,43.4 -9.3,42.9 -8.85,42.2 -8.7,41.15 -8.9,40.15 -9.1,39.6 -9.5,38.8 -8.9,38.5 -8.85,37.95 -9.0,37.0 -7.9,37.0 -6.9,37.2 -6.3,36.5 -5.6,36.0",
+// Noord-Afrika (kustlijn)
+"-5.35,35.9 -3.5,35.25 -2.9,35.3 -1.9,35.1 -0.65,35.75 0.5,36.3 2.0,36.6 3.05,36.8 5.1,36.65 6.6,37.05 7.8,36.9 8.6,36.95 9.8,37.3 10.2,37.2 11.0,37.05 10.5,36.6 10.6,36.0 11.0,35.4 10.9,34.7 10.1,34.2 11.1,33.3 11.5,33.1 11.5,27.5 -13.0,27.5 -9.9,29.7 -9.7,30.4 -9.8,31.5 -9.3,32.3 -8.5,33.25 -7.6,33.6 -6.85,34.05 -6.2,35.15 -5.9,35.8",
+// Groot-Brittannië
+"-5.7,50.05 -4.2,50.35 -3.5,50.45 -2.45,50.55 -1.3,50.75 0.25,50.75 1.4,51.1 1.4,51.35 0.9,51.45 1.25,51.85 1.75,52.6 0.4,52.95 0.1,53.6 -0.1,54.1 -0.6,54.5 -1.4,55.0 -2.0,55.8 -2.8,56.05 -2.5,56.45 -2.1,57.15 -1.8,57.6 -3.5,57.7 -4.2,57.5 -3.0,58.65 -5.0,58.6 -5.5,57.9 -5.7,57.3 -5.6,56.5 -5.7,56.0 -5.4,55.4 -4.9,55.8 -5.1,54.75 -4.9,54.65 -3.4,54.95 -3.6,54.4 -2.9,54.0 -3.05,53.4 -3.3,53.35 -4.6,53.3 -4.7,52.8 -4.1,52.4 -5.3,51.9 -4.0,51.6 -3.2,51.45 -2.7,51.5 -3.4,51.2 -4.2,51.2 -4.55,51.0 -5.2,50.3",
+// Ierland
+"-6.4,52.15 -8.3,51.75 -9.8,51.45 -10.3,51.9 -10.4,52.15 -9.8,52.6 -9.2,53.2 -10.1,53.5 -10.0,54.2 -8.6,54.3 -8.4,54.95 -7.4,55.35 -6.9,55.2 -6.2,55.2 -5.9,54.6 -5.5,54.4 -6.2,54.0 -6.1,53.3 -6.0,52.9",
+// IJsland
+"-22.5,63.8 -18.5,63.4 -14.5,64.3 -13.6,65.1 -16.0,66.5 -20.0,66.1 -22.5,66.4 -24.0,65.5 -22.5,64.0",
+// Sicilië, Sardinië, Corsica, Kreta, Mallorca, Seeland, Funen
+"12.4,38.0 13.4,38.15 14.0,38.0 15.1,38.3 15.65,38.25 15.1,37.5 15.3,37.05 15.1,36.7 14.2,37.05 13.5,37.25 12.6,37.65",
+"8.2,40.95 9.2,41.25 9.6,41.0 9.75,40.5 9.65,39.5 9.2,39.2 8.5,38.9 8.4,39.5 8.5,39.9 8.3,40.55",
+"9.4,43.0 9.55,42.5 9.45,41.9 9.15,41.4 8.6,41.9 8.55,42.4 8.75,42.55 9.3,42.75",
+"23.55,35.3 24.0,35.5 25.2,35.35 26.3,35.3 26.2,35.0 24.9,34.95 24.0,35.15",
+"2.35,39.55 3.1,39.9 3.45,39.7 3.2,39.3 2.9,39.4 2.6,39.5",
+"11.2,55.9 12.1,56.1 12.6,56.0 12.6,55.65 12.4,55.3 11.8,55.15 11.1,55.3 11.0,55.65",
+"9.8,55.5 10.5,55.65 10.8,55.5 10.6,55.1 10.0,55.1"
+];
+const proj = (lon, lat) => [lon * K, -lat];
+const LAND_D = LAND.map(str => 'M' + str.trim().split(/\s+/).map(p => { const a = p.split(',').map(Number); return (a[0] * K).toFixed(2) + ',' + (-a[1]).toFixed(2); }).join('L') + 'Z').join('');
+
+/* ---------- plaatsen (offline zoeklijst) ---------- */
+const PLACES = ("Gent|51.05|3.72;Brussel|50.85|4.35;Antwerpen|51.22|4.40;Brugge|51.21|3.22;De Panne|51.10|2.60;Oostende|51.23|2.92;Durbuy|50.35|5.46;La Roche-en-Ardenne|50.18|5.58;Amsterdam|52.37|4.90;Renesse (Zeeland)|51.73|3.77;Luxemburg|49.61|6.13;Keulen|50.94|6.96;Berlijn|52.52|13.40;München|48.14|11.58;Hamburg|53.55|9.99;Cochem (Moezel)|50.15|7.17;Freiburg (Zwarte Woud)|47.99|7.85;Konstanz (Bodensee)|47.66|9.18;" +
+"Parijs|48.86|2.35;Mont-Saint-Michel|48.64|-1.51;Étretat|49.71|0.20;Quiberon (Bretagne)|47.48|-3.12;Amboise (Loire)|47.41|0.98;Bordeaux|44.84|-0.58;Biarritz|43.48|-1.56;Duin van Pilat|44.60|-1.21;Sarlat (Dordogne)|44.89|1.22;Avignon (Provence)|43.95|4.81;Gorges du Verdon|43.75|6.33;Marseille|43.30|5.37;Nice|43.70|7.27;Chamonix|45.92|6.87;Lyon|45.76|4.84;Straatsburg|48.58|7.75;Colmar (Elzas)|48.08|7.36;Gérardmer (Vogezen)|48.07|6.88;Lourdes (Pyreneeën)|43.10|-0.05;" +
+"Barcelona|41.39|2.17;Cadaqués (Costa Brava)|42.29|3.28;Valencia|39.47|-0.38;Madrid|40.42|-3.70;Sevilla|37.39|-5.98;Granada|37.18|-3.60;Málaga|36.72|-4.42;Tarifa|36.01|-5.60;San Sebastián|43.32|-1.98;Cangas de Onís (Picos de Europa)|43.35|-5.13;Santiago de Compostela|42.88|-8.54;Palma de Mallorca|39.57|2.65;Lissabon|38.72|-9.14;Porto|41.16|-8.63;Lagos (Algarve)|37.10|-8.67;" +
+"Rome|41.90|12.50;Florence|43.77|11.26;Venetië|45.44|12.32;Milaan|45.46|9.19;Sirmione (Gardameer)|45.49|10.61;Bellagio (Comomeer)|45.99|9.26;Cinque Terre|44.12|9.71;Siena (Toscane)|43.32|11.33;Napels|40.85|14.27;Amalfi|40.63|14.60;Ostuni (Apulië)|40.73|17.58;Cortina (Dolomieten)|46.54|12.14;Palermo|38.12|13.36;Olbia (Sardinië)|40.92|9.50;Ajaccio (Corsica)|41.92|8.74;" +
+"Zürich|47.38|8.54;Interlaken|46.69|7.86;Zermatt|46.02|7.75;Wenen|48.21|16.37;Salzburg|47.80|13.04;Innsbruck|47.26|11.39;Praag|50.08|14.44;Boedapest|47.50|19.04;Krakau|50.06|19.94;Warschau|52.23|21.01;" +
+"Kopenhagen|55.68|12.57;Skagen|57.72|10.59;Oslo|59.91|10.75;Bergen|60.39|5.32;Geirangerfjord|62.10|7.21;Svolvær (Lofoten)|68.23|14.57;Noordkaap|71.17|25.78;Stockholm|59.33|18.07;Göteborg|57.71|11.97;Helsinki|60.17|24.94;Tallinn|59.44|24.75;Riga|56.95|24.11;Vilnius|54.69|25.28;" +
+"Edinburgh|55.95|-3.19;Londen|51.51|-0.13;Land's End (Cornwall)|50.07|-5.71;Dublin|53.35|-6.26;Killarney (Kerry)|52.06|-9.51;Reykjavik|64.15|-21.94;" +
+"Zagreb|45.81|15.98;Split|43.51|16.44;Dubrovnik|42.65|18.09;Plitvice|44.88|15.62;Ljubljana|46.06|14.51;Bled|46.37|14.11;Athene|37.98|23.73;Thessaloniki|40.64|22.94;Meteora|39.72|21.63;Istanbul|41.01|28.98;Boekarest|44.43|26.10;Sofia|42.70|23.32;Kotor|42.42|18.77;Tirana|41.33|19.82;Marrakech|31.63|-8.01;Tanger|35.77|-5.80")
+  .split(';').map(s => { const a = s.split('|'); return { name: a[0], lat: +a[1], lon: +a[2], n: norm(a[0]) }; });
+
+/* ---------- state ---------- */
+const KINDS = {
+  reservering: { label: 'Gereserveerd', color: 'var(--orange)' },
+  plan:        { label: 'Reisplan',     color: 'var(--accent)' },
+  onderhoud:   { label: 'Onderhoud / niet beschikbaar', color: 'var(--violet)' }
+};
+const PALETTE = ['#1d6b64', '#d9742b', '#7a6fa8', '#5b8f4a', '#c2476b', '#3b7bbf', '#b58a1d'];
+const now = new Date();
+const S = {
+  trips: [], bookings: [], todos: [], spots: [], spotsLoaded: false, spotFav: false, requests: [], reqTab: 'cal', newReqCount: 0, todoCat: 'alle', todoShow: 'open', settings: {}, tab: 'home', db: null, user: null, sample: null, me: null,
+  canWrite: null, canAdmin: false, names: {}, namesAsked: '', tripsLoaded: false, selTrip: null,
+  cal: { y: now.getFullYear(), m: now.getMonth(), sel: todayStr() }, error: '', photoCache: {}
+};
+const writable = () => !!S.db && S.canWrite !== false;
+const canEditItem = it => writable() && (S.canAdmin || !it.by || (S.me && it.by === S.me.id));
+const nameOf = id => (S.names[id]) || (S.me && id === S.me.id ? 'jij' : 'iemand');
+const sortedTrips = () => S.trips.slice().sort((a, b) => (b.start || '').localeCompare(a.start || ''));
+const tripColor = t => { const asc = S.trips.slice().sort((a, b) => (a.start || '').localeCompare(b.start || '')); return PALETTE[Math.max(0, asc.findIndex(x => x.id === t.id)) % PALETTE.length]; };
+
+function toast(msg) {
+  const el = $('#toast'); el.innerHTML = '<div class="toast">' + esc(msg) + '</div>';
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.innerHTML = ''; }, 3200);
+}
+function dbFail(e) {
+  const c = e && e.code;
+  if (c === 'invalid_argument') { S.canWrite = false; toast('Je hebt alleen leesrechten in dit logboek.'); render(); }
+  else if (c === 'quota_exceeded') toast('Opslag is vol. Verwijder oude foto’s of reizen.');
+  else if (c === 'resource_exhausted') toast('Even rustig aan – probeer het zo opnieuw.');
+  else toast('Opslaan is niet gelukt. Probeer opnieuw.');
+}
+
+/* ---------- boot ---------- */
+/* ---------- opslag, aanmelding en leden (Supabase) ---------- */
+const isPhotoPath = p => /^(trips|spots)\/[^/]+\/photos(\/|$)/.test(p);
+const parentOf = p => p.replace(/\/[^/]+$/, '');
+const lastOf = p => p.split('/').pop();
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+function mapErr(e) {
+  const c = e && (e.code || e.status);
+  if (c === '42501' || c === 'PGRST301' || c === 401 || c === 403 || c === 'invalid_argument') return { code: 'invalid_argument', message: (e && e.message) || '' };
+  return { code: 'unavailable', message: (e && e.message) || '' };
+}
+
+function makeDb(sb) {
+  const collSubs = new Set(), docSubs = new Set();
+  async function fetchColl(coll) {
+    const m = coll.match(/^(?:trips|spots)\/([^/]+)\/photos$/);
+    if (m) {
+      const { data, error } = await sb.from('photos').select('id,data').eq('trip_id', m[1]);
+      if (error) throw mapErr(error);
+      return (data || []).map(r => ({ id: r.id, data: r.data }));
+    }
+    const { data, error } = await sb.from('docs').select('path,data').eq('coll', coll);
+    if (error) throw mapErr(error);
+    return (data || []).map(r => ({ id: lastOf(r.path), data: r.data }));
+  }
+  async function fetchDoc(path) {
+    if (isPhotoPath(path)) {
+      const { data, error } = await sb.from('photos').select('id,data').eq('id', lastOf(path)).maybeSingle();
+      if (error) throw mapErr(error);
+      return data ? data.data : undefined;
+    }
+    const { data, error } = await sb.from('docs').select('path,data').eq('path', path).maybeSingle();
+    if (error) throw mapErr(error);
+    return data ? data.data : undefined;
+  }
+  function dispatch(type, path, data) {
+    if (!path || isPhotoPath(path)) return;
+    const coll = parentOf(path);
+    collSubs.forEach(s => { if (s.coll === coll) s.apply(type, lastOf(path), data); });
+    docSubs.forEach(s => { if (s.path === path) s.apply(type, data); });
+  }
+  async function putDoc(path, data) {
+    const q = isPhotoPath(path)
+      ? sb.from('photos').upsert({ id: lastOf(path), trip_id: path.split('/')[1], data }, { onConflict: 'id' })
+      : sb.from('docs').upsert({ path, data, updated_at: new Date().toISOString() }, { onConflict: 'path' });
+    const { error } = await q;
+    if (error) throw mapErr(error);
+    dispatch('set', path, data);
+  }
+  async function removeDoc(path) {
+    const q = isPhotoPath(path) ? sb.from('photos').delete().eq('id', lastOf(path)) : sb.from('docs').delete().eq('path', path);
+    const { error } = await q;
+    if (error) throw mapErr(error);
+    dispatch('delete', path, undefined);
+  }
+  function onColl(coll, next, error) {
+    let items = new Map(), last = null, dead = false, first = true;
+    const emit = () => {
+      const arr = [...items], sig = JSON.stringify(arr);
+      if (sig === last) return;
+      last = sig;
+      next({ docs: arr.map(([id, d]) => ({ id, exists: true, data: () => d })), size: arr.length, empty: !arr.length });
+    };
+    const s = {
+      coll,
+      apply(type, id, data) { if (dead) return; if (type === 'delete') items.delete(id); else items.set(id, data); emit(); },
+      async reload() {
+        try { const rows = await fetchColl(coll); if (dead) return; items = new Map(rows.map(r => [r.id, r.data])); first = false; emit(); }
+        catch (e) { if (!dead && first && error) { first = false; error(e); } }
+      }
+    };
+    collSubs.add(s); s.reload();
+    return () => { dead = true; collSubs.delete(s); };
+  }
+  function onDoc(path, next, error) {
+    let cur, last = null, dead = false, first = true;
+    const emit = () => {
+      const sig = JSON.stringify(cur === undefined ? null : cur);
+      if (!first && sig === last) return;
+      first = false; last = sig;
+      next({ id: lastOf(path), exists: cur !== undefined, data: () => cur });
+    };
+    const s = {
+      path,
+      apply(type, data) { if (dead) return; cur = type === 'delete' ? undefined : data; emit(); },
+      async reload() {
+        try { const d = await fetchDoc(path); if (dead) return; cur = d; emit(); }
+        catch (e) { if (!dead && first && error) { first = false; error(e); } }
+      }
+    };
+    docSubs.add(s); s.reload();
+    return () => { dead = true; docSubs.delete(s); };
+  }
+  function reloadAll() { collSubs.forEach(s => s.reload()); docSubs.forEach(s => s.reload()); }
+  try {
+    sb.channel('docs-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, p => {
+        if (p.eventType === 'DELETE') dispatch('delete', p.old && p.old.path, undefined);
+        else if (p.new) dispatch('set', p.new.path, p.new.data);
+      })
+      .subscribe(st => { if (st === 'SUBSCRIBED') reloadAll(); });
+  } catch (e) {}
+  setInterval(() => { if (!document.hidden) reloadAll(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) reloadAll(); });
+
+  function docRef(path) {
+    return {
+      id: lastOf(path), path,
+      async get() { const d = await fetchDoc(path); return { id: lastOf(path), exists: d !== undefined, data: () => d }; },
+      set: data => putDoc(path, data),
+      async update(patch) {
+        const cur = await fetchDoc(path);
+        if (cur === undefined) throw { code: 'invalid_argument', message: 'Document bestaat niet.' };
+        return putDoc(path, Object.assign({}, cur, patch));
+      },
+      delete: () => removeDoc(path),
+      onSnapshot: (n, e) => onDoc(path, n, e)
+    };
+  }
+  function collRef(coll) {
+    return {
+      path: coll,
+      doc: id => docRef(coll + '/' + (id || newId())),
+      async get() { const rows = await fetchColl(coll); return { docs: rows.map(r => ({ id: r.id, exists: true, data: () => r.data })), size: rows.length, empty: !rows.length }; },
+      onSnapshot: (n, e) => onColl(coll, n, e)
+    };
+  }
+  return { doc: docRef, collection: collRef, reload: reloadAll };
+}
+
+const ROLES = { pending: 'Wacht op goedkeuring', viewer: 'Alleen kaart en tijdlijn', member: 'Alles (toevoegen en bewerken)', admin: 'Beheerder' };
+
+function authShell(inner, wide) { $('#auth').innerHTML = '<div class="authwrap"><div class="authcard' + (wide ? ' wide' : '') + '">' + inner + '</div></div>'; }
+function showMessage(title, text, extra) {
+  authShell('<h1>' + esc(title) + '</h1><p>' + esc(text) + '</p>' + (extra || ''));
+}
+function showAuth(mode, msg, isErr) {
+  S.authMode = mode || S.authMode || 'in';
+  const reg = S.authMode === 'up';
+  authShell('<h1>Camper Danny</h1>' +
+    '<p>Wil je de camper huren? Dien hier je aanvraag in. Je hebt geen account nodig.</p>' +
+    '<button class="primary big" type="button" data-req="open" style="margin-top:12px">Huuraanvraag indienen</button>' +
+    '<div class="divider"><span>Voor leden</span></div>' +
+    '<form id="authform" novalidate><p>' + (reg ? 'Maak een account. De beheerder moet je daarna nog goedkeuren.' : 'Log in om het camperlogboek te openen.') + '</p>' +
+    (reg ? '<label><span class="lbl">Jouw naam</span><input id="a-name" autocomplete="name"></label>' : '') +
+    '<label><span class="lbl">E-mailadres</span><input id="a-email" type="email" autocomplete="email" inputmode="email" autocapitalize="none"></label>' +
+    '<label><span class="lbl">Wachtwoord</span><input id="a-pass" type="password" autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></label>' +
+    '<div class="hint' + (isErr ? ' err' : '') + '" id="a-msg">' + esc(msg || '') + '</div>' +
+    '<button class="primary" id="a-go" type="submit" style="width:100%;margin-top:12px">' + (reg ? 'Account maken' : 'Inloggen') + '</button>' +
+    '<button class="ghost" type="button" data-auth="mode" style="width:100%;margin-top:8px">' + (reg ? 'Ik heb al een account' : 'Nieuw account maken') + '</button></form>');
+}
+function authMsg(e) {
+  const m = String((e && e.message) || '');
+  if (/invalid login/i.test(m)) return 'E-mailadres of wachtwoord klopt niet.';
+  if (/already registered/i.test(m)) return 'Dit e-mailadres heeft al een account. Log in.';
+  if (/not confirmed/i.test(m)) return 'Bevestig eerst je e-mailadres via de mail die we stuurden.';
+  if (/rate limit|too many/i.test(m)) return 'Te veel pogingen. Wacht even en probeer opnieuw.';
+  if (/password/i.test(m)) return 'Kies een sterker wachtwoord (minstens 6 tekens).';
+  if (/fetch|network/i.test(m)) return 'Geen verbinding. Controleer je internet en probeer opnieuw.';
+  return 'Dat lukte niet. ' + m;
+}
+async function doAuth() {
+  const reg = S.authMode === 'up';
+  const email = ($('#a-email').value || '').trim(), pass = $('#a-pass').value || '', name = reg ? ($('#a-name').value || '').trim() : '';
+  const msg = (t, err) => { const m = $('#a-msg'); if (m) { m.textContent = t; m.className = 'hint' + (err ? ' err' : ''); } };
+  if (!email || !pass) { msg('Vul je e-mailadres en wachtwoord in.', true); return; }
+  if (reg && !name) { msg('Vul je naam in, zodat de anderen weten wie je bent.', true); return; }
+  if (reg && pass.length < 6) { msg('Kies een wachtwoord van minstens 6 tekens.', true); return; }
+  const btn = $('#a-go'); btn.disabled = true; msg('Even geduld…');
+  try {
+    const r = reg ? await S.sb.auth.signUp({ email, password: pass, options: { data: { name } } }) : await S.sb.auth.signInWithPassword({ email, password: pass });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.session) { showAuth('in', 'Bevestig eerst je e-mailadres via de mail die we stuurden. Log daarna in.'); return; }
+    await afterLogin(r.data.session.user);
+  } catch (e) { const b = $('#a-go'); if (b) b.disabled = false; msg(authMsg(e), true); }
+}
+async function loadMembers() {
+  const { data, error } = await S.sb.from('members').select('user_id,name,role');
+  if (error || !data) return;
+  S.members = data; S.names = {};
+  data.forEach(m => { S.names[m.user_id] = m.name; });
+  S.pendingCount = S.role === 'admin' ? data.filter(m => m.role === 'pending').length : 0;
+}
+let namesBusy = false;
+async function resolveNames() {
+  if (!S.sb || !S.role || namesBusy) return;
+  const ids = S.trips.map(t => t.by).concat(S.bookings.map(b => b.by), S.todos.map(x => x.by), S.spots.map(x => x.by)).filter(Boolean);
+  if (!ids.some(id => !(id in S.names))) return;
+  namesBusy = true;
+  try { await loadMembers(); } finally { namesBusy = false; }
+  ids.forEach(id => { if (!(id in S.names)) S.names[id] = ''; });
+  refresh();
+}
+function refresh() { // zachte update: niet tijdens bewerken van een formulier
+  renderHeader(); renderView(); renderNav();
+  if (S.sheetKind === 'detail') openDetail(S.sheetId, true);
+  if (S.sheetKind === 'spot') openSpot(S.sheetId, true);
+}
+
+async function afterLogin(user) {
+  S.me = { id: user.id, name: (user.user_metadata && user.user_metadata.name) || String(user.email || '').split('@')[0], email: user.email };
+  const { data, error } = await S.sb.from('members').select('user_id,name,role').eq('user_id', user.id).maybeSingle();
+  if (error || !data) {
+    showMessage('Account niet gevonden', 'Je profiel is nog niet aangemaakt. Vraag de beheerder om te controleren of de installatie in Supabase (het SQL-bestand) is uitgevoerd.',
+      '<button class="ghost" data-auth="logout" style="width:100%;margin-top:12px">Uitloggen</button>');
+    return;
+  }
+  S.role = data.role; S.me.name = data.name || S.me.name;
+  if (S.role === 'pending') {
+    showMessage('Bijna binnen', 'Je account is aangemaakt. De beheerder moet je nog toegang geven. Probeer het later opnieuw.',
+      '<button class="primary" data-auth="recheck" style="width:100%;margin-top:12px">Opnieuw controleren</button><button class="ghost" data-auth="logout" style="width:100%;margin-top:8px">Uitloggen</button>');
+    return;
+  }
+  $('#auth').innerHTML = '';
+  S.db = makeDb(S.sb);
+  S.canWrite = S.role === 'member' || S.role === 'admin';
+  S.canAdmin = S.role === 'admin';
+  S.names = {}; await loadMembers();
+  if (!S.canWrite && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) S.tab = 'home';
+  render();
+  const db = S.db;
+  const onErr = e => {
+    if (e && e.code === 'revoked') { S.error = 'Je toegang is gewijzigd. Open de app opnieuw.'; render(); }
+    else if (e && e.code === 'unavailable') { S.error = 'Verbinding met de gegevens mislukt. Herlaad de pagina.'; S.tripsLoaded = true; render(); }
+  };
+  db.collection('trips').onSnapshot(snap => {
+    S.trips = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    S.tripsLoaded = true; resolveNames(); refresh();
+  }, onErr);
+  db.doc('settings/main').onSnapshot(s => { S.settings = s.exists ? (s.data() || {}) : {}; renderHeader(); }, onErr);
+  if (S.canWrite) {
+    db.collection('bookings').onSnapshot(snap => {
+      S.bookings = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      resolveNames(); refresh();
+    }, onErr);
+    db.collection('todos').onSnapshot(snap => {
+      S.todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      resolveNames(); refresh();
+    }, onErr);
+    db.collection('spots').onSnapshot(snap => {
+      S.spots = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      const first = !S.spotsLoaded; S.spotsLoaded = true; resolveNames(); refresh(); if (first) setTimeout(repairSpots, 1200);
+    }, onErr);
+    loadRequests(); startRequestLive();
+  }
+}
+
+async function boot() {
+  const cfg = window.APP_CONFIG || {};
+  if (!window.supabase || !/^https:\/\//.test(cfg.SUPABASE_URL || '') || !cfg.SUPABASE_ANON_KEY || /JOUW/.test(cfg.SUPABASE_ANON_KEY)) {
+    showMessage('Nog niet gekoppeld', 'Deze app is nog niet gekoppeld aan Supabase. Vul de gegevens in het bestand config.js in en upload de map opnieuw.');
+    return;
+  }
+  S.sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  const wantsForm = location.hash === '#huur';
+  try {
+    const { data } = await S.sb.auth.getSession();
+    if (!data.session) { if (wantsForm) showRequest(); else showAuth('in'); return; }
+    await afterLogin(data.session.user);
+    if (wantsForm) showRequest();
+  } catch (e) {
+    showMessage('Geen verbinding', 'De app kon de gegevens niet bereiken. Controleer je internet en herlaad de pagina.');
+  }
+}
+document.addEventListener('submit', e => { if (e.target.id === 'authform') { e.preventDefault(); doAuth(); } });
+document.addEventListener('click', async e => {
+  const a = e.target.closest('[data-auth]'); if (!a) return;
+  const k = a.dataset.auth;
+  if (k === 'mode') showAuth(S.authMode === 'up' ? 'in' : 'up');
+  else if (k === 'logout') { try { await S.sb.auth.signOut(); } catch (x) {} location.reload(); }
+  else if (k === 'recheck') { try { const { data } = await S.sb.auth.getSession(); if (data.session) afterLogin(data.session.user); else location.reload(); } catch (x) { location.reload(); } }
+});
+document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.role) changeRole(t.dataset.role, t.value); });
+
+/* ---------- render shell ---------- */
+function totalKm() { return (+S.settings.baseKm || 0) + S.trips.reduce((s, t) => s + (+t.km || 0), 0); }
+function renderHeader() {
+  const name = S.settings.name || 'Camper Danny';
+  $('#hdr').innerHTML =
+    '<div class="ttl"><h1>' + esc(name) + '</h1><div class="sub">' + (S.canWrite === false ? 'Alleen lezen' : 'Camperlogboek') + '</div></div>' +
+    '<div class="kmbadge"><b>' + fmtNum(totalKm()) + '</b><span>km gereden</span></div>' +
+    (S.db ? '<button class="iconbtn" data-act="settings" aria-label="Account en instellingen">' + (S.pendingCount ? '<i class="badge"></i>' : '') + '⚙︎</button>' : '');
+  $('#banner').innerHTML = S.error ? '<div class="banner">' + esc(S.error) + '</div>' : '';
+}
+const ICONS = {
+  home: '<svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>',
+  todo: '<svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><path d="m3.5 6 1.3 1.3L7 5M3.5 12l1.3 1.3L7 11M3.5 18l1.3 1.3L7 17"/></svg>',
+  map: '<svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>',
+  timeline: '<svg viewBox="0 0 24 24"><path d="M6 3v18M6 6h12M6 12h8M6 18h11"/><circle cx="6" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/></svg>',
+  spots: '<svg viewBox="0 0 24 24"><path d="M3 20 12 5l9 15z"/><path d="M12 5v15M9 20l3-6 3 6"/></svg>',
+  agenda: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>'
+};
+const full = () => S.canWrite !== false;
+function renderNav() {
+  const tabs = [['home', 'Start'], ['map', 'Kaart'], ['timeline', 'Tijdlijn']];
+  if (full()) tabs.push(['spots', 'Spots'], ['agenda', 'Agenda'], ['todo', 'To-do']);
+  $('#nav').innerHTML = tabs.map(t => '<button class="' + (S.tab === t[0] ? 'on' : '') + '" data-act="tab" data-t="' + t[0] + '">' + ICONS[t[0]] + t[1] + (t[0] === 'agenda' && S.newReqCount ? '<i class="navdot"></i>' : '') + '</button>').join('');
+}
+function renderFab() {
+  if (!writable() || S.tab === 'home' || (S.tab === 'agenda' && S.reqTab === 'req')) { $('#fabslot').innerHTML = ''; return; }
+  const m = { agenda: ['newbooking', 'Reserveren'], todo: ['newtodo', 'Nieuw punt'], spots: ['newspot', 'Nieuwe spot'] }[S.tab] || ['newtrip', 'Nieuwe reis'];
+  $('#fabslot').innerHTML = '<button class="fab" data-act="' + m[0] + '"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>' + m[1] + '</button>';
+}
+function render() { renderHeader(); renderView(); renderNav(); }
+function renderView() {
+  if (!full() && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) S.tab = 'home';
+  renderFab();
+  const v = $('#view');
+  if (S.tab === 'home') v.innerHTML = homeView();
+  else if (S.tab === 'map') { v.innerHTML = mapView(); initMap(); }
+  else if (S.tab === 'timeline') v.innerHTML = timelineView();
+  else if (S.tab === 'todo') v.innerHTML = todoView();
+  else if (S.tab === 'spots') v.innerHTML = spotsView();
+  else v.innerHTML = agendaView();
+}
+
+/* ---------- landgrenzen, landnamen en steden ---------- */
+const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json';
+const GEO = { land: '', bord: '', state: 0 };
+function buildGeo(t) {
+  if (!t || !t.transform || !t.arcs || !t.objects) throw new Error('geo');
+  const sc = t.transform.scale, tr = t.transform.translate, X0 = -30, X1 = 60, Y0 = 20, Y1 = 75, TOL = 0.02;
+  const arcs = t.arcs.map(a => {
+    let x = 0, y = 0, lx = 1e9, ly = 1e9, inside = false; const pts = [];
+    for (let i = 0; i < a.length; i++) {
+      x += a[i][0]; y += a[i][1];
+      const lon = x * sc[0] + tr[0], lat = y * sc[1] + tr[1];
+      if (lon >= X0 && lon <= X1 && lat >= Y0 && lat <= Y1) inside = true;
+      if (i === a.length - 1 || Math.abs(lon - lx) > TOL || Math.abs(lat - ly) > TOL) {
+        const cx = clamp(lon, X0, X1), cy = clamp(lat, Y0, Y1), q = pts[pts.length - 1];
+        if (!q || q[0] !== cx || q[1] !== cy) pts.push([cx, cy]);
+        lx = lon; ly = lat;
+      }
+    }
+    return { pts, inside };
+  });
+  const pt = p => (p[0] * K).toFixed(2) + ',' + (-p[1]).toFixed(2);
+  const arcPts = i => i < 0 ? arcs[~i].pts.slice().reverse() : arcs[i].pts;
+  const geoms = o => !o ? [] : o.geometries ? o.geometries : [o];
+  const polys = g => g.type === 'Polygon' ? [g.arcs] : g.type === 'MultiPolygon' ? g.arcs : [];
+  const ringD = idx => {
+    if (!idx.some(i => arcs[i < 0 ? ~i : i].inside)) return '';
+    let pts = []; idx.forEach(i => { const a = arcPts(i); pts = pts.concat(pts.length ? a.slice(1) : a); });
+    return pts.length > 2 ? 'M' + pts.map(pt).join('L') + 'Z' : '';
+  };
+  const countries = geoms(t.objects.countries);
+  let land = '';
+  (geoms(t.objects.land).length ? geoms(t.objects.land) : countries).forEach(g => polys(g).forEach(p => p.forEach(r => { land += ringD(r); })));
+  const cnt = new Array(arcs.length).fill(0);
+  countries.forEach(g => polys(g).forEach(p => p.forEach(r => r.forEach(i => { cnt[i < 0 ? ~i : i]++; }))));
+  let bord = '';
+  cnt.forEach((c, i) => { if (c >= 2 && arcs[i].inside && arcs[i].pts.length > 1) bord += 'M' + arcs[i].pts.map(pt).join('L'); });
+  if (!land) throw new Error('geo');
+  return { land, bord };
+}
+function applyGeo() {
+  const l = $('#mapsvg .land'), b = $('#mapsvg .bord');
+  if (l && GEO.land) l.setAttribute('d', GEO.land);
+  if (b) b.setAttribute('d', GEO.bord);
+}
+function loadGeo() {
+  if (GEO.state) return; GEO.state = 1;
+  const ctl = window.AbortController ? new AbortController() : null, to = setTimeout(() => { if (ctl) ctl.abort(); }, 30000);
+  fetch(GEO_URL, ctl ? { signal: ctl.signal } : {}).then(r => { if (!r.ok) throw new Error('geo'); return r.json(); })
+    .then(topo => { const g = buildGeo(topo); GEO.land = g.land; GEO.bord = g.bord; GEO.state = 2; applyGeo(); })
+    .catch(() => { GEO.state = 0; })
+    .then(() => clearTimeout(to));
+}
+// naam|breedte|lengte|grootte (3 = groot land, 1 = klein land)
+const COUNTRIES = ("Portugal|39.7|-8.0|2;Spanje|40.0|-3.7|3;Frankrijk|46.6|2.4|3;België|50.6|4.7|1;Nederland|52.2|5.6|1;Luxemburg|49.8|6.1|1;Duitsland|51.1|10.3|3;Zwitserland|46.8|8.2|1;Oostenrijk|47.4|14.2|2;Italië|42.9|12.2|3;Tsjechië|49.8|15.5|2;Polen|52.1|19.3|3;Denemarken|56.0|9.3|1;Noorwegen|61.8|9.3|3;Zweden|62.5|15.5|3;Finland|63.8|26.5|3;Estland|58.8|25.5|1;Letland|56.9|25.0|1;Litouwen|55.4|23.9|1;Wit-Rusland|53.6|28.0|2;Oekraïne|49.0|31.5|3;Slowakije|48.7|19.5|1;Hongarije|47.1|19.4|2;Slovenië|46.1|14.8|1;Kroatië|45.4|16.2|1;Bosnië en Herzegovina|44.2|17.8|1;Servië|44.0|20.8|1;Montenegro|42.8|19.2|1;Noord-Macedonië|41.6|21.7|1;Albanië|41.1|20.0|1;Griekenland|39.5|22.0|2;Bulgarije|42.7|25.2|2;Roemenië|45.9|25.0|2;Moldavië|47.2|28.5|1;Turkije|39.0|35.0|3;Ierland|53.2|-8.0|2;Verenigd Koninkrijk|52.9|-1.5|3;IJsland|64.9|-18.5|2;Marokko|32.3|-6.0|2;Algerije|34.2|2.5|3;Tunesië|34.0|9.3|2;Rusland|60.0|40.0|3")
+  .split(';').map(s => { const a = s.split('|'); return { name: a[0], lat: +a[1], lon: +a[2], c: +a[3] }; });
+// naam|breedte|lengte, per grootte: 1 = hoofdsteden en wereldsteden, 2 = grote steden, 3 = middelgrote steden
+const CITY_T1 = "Londen|51.51|-0.13;Parijs|48.86|2.35;Brussel|50.85|4.35;Amsterdam|52.37|4.90;Berlijn|52.52|13.40;Madrid|40.42|-3.70;Lissabon|38.72|-9.14;Rome|41.90|12.50;Wenen|48.21|16.37;Praag|50.08|14.44;Warschau|52.23|21.01;Boedapest|47.50|19.04;Stockholm|59.33|18.07;Oslo|59.91|10.75;Helsinki|60.17|24.94;Kopenhagen|55.68|12.57;Dublin|53.35|-6.26;Athene|37.98|23.73;Boekarest|44.43|26.10;Kiev|50.45|30.52;Istanbul|41.01|28.98;Reykjavik|64.15|-21.94;Moskou|55.76|37.62;Barcelona|41.39|2.17;Milaan|45.46|9.19;München|48.14|11.58;Hamburg|53.55|9.99";
+const CITY_T2 = "Sofia|42.70|23.32;Belgrado|44.79|20.45;Zagreb|45.81|15.98;Minsk|53.90|27.57;Riga|56.95|24.11;Tallinn|59.44|24.75;Vilnius|54.69|25.28;Ankara|39.93|32.86;Edinburgh|55.95|-3.19;Bern|46.95|7.45;Luxemburg|49.61|6.13;Bratislava|48.15|17.11;Ljubljana|46.06|14.51;Sarajevo|43.86|18.41;Tirana|41.33|19.82;Skopje|42.00|21.43;Marseille|43.30|5.37;Lyon|45.76|4.84;Toulouse|43.60|1.44;Bordeaux|44.84|-0.58;Nantes|47.22|-1.55;Rijsel|50.63|3.06;Straatsburg|48.58|7.75;Nice|43.70|7.27;Valencia|39.47|-0.38;Sevilla|37.39|-5.98;Málaga|36.72|-4.42;Bilbao|43.26|-2.93;Zaragoza|41.65|-0.89;Porto|41.16|-8.63;Napels|40.85|14.27;Turijn|45.07|7.69;Venetië|45.44|12.32;Florence|43.77|11.26;Genua|44.41|8.93;Palermo|38.12|13.36;Keulen|50.94|6.96;Frankfurt|50.11|8.68;Stuttgart|48.78|9.18;Düsseldorf|51.23|6.78;Dresden|51.05|13.74;Leipzig|51.34|12.37;Hannover|52.37|9.74;Bremen|53.08|8.80;Neurenberg|49.45|11.08;Zürich|47.38|8.54;Genève|46.20|6.14;Salzburg|47.80|13.04;Krakau|50.06|19.94;Gdansk|54.35|18.65;Wroclaw|51.11|17.04;Göteborg|57.71|11.97;Bergen|60.39|5.32;Malmö|55.60|13.00;Rotterdam|51.92|4.48;Antwerpen|51.22|4.40;Gent|51.05|3.72;Luik|50.63|5.57;Manchester|53.48|-2.24;Birmingham|52.49|-1.89;Glasgow|55.86|-4.25;Cardiff|51.48|-3.18;Belfast|54.60|-5.93;Cork|51.90|-8.47;Thessaloniki|40.64|22.94;Split|43.51|16.44;Rabat|34.02|-6.84;Casablanca|33.57|-7.59;Marrakech|31.63|-8.01;Algiers|36.75|3.06;Tunis|36.81|10.18";
+const CITY_T3 = "Brugge|51.21|3.22;Charleroi|50.41|4.44;Namen|50.47|4.87;Leuven|50.88|4.70;Mechelen|51.03|4.48;Hasselt|50.93|5.34;Kortrijk|50.83|3.26;Oostende|51.23|2.92;Utrecht|52.09|5.12;Den Haag|52.08|4.30;Eindhoven|51.44|5.48;Groningen|53.22|6.57;Maastricht|50.85|5.69;Aken|50.78|6.08;Trier|49.75|6.64;Koblenz|50.36|7.59;Mainz|50.00|8.27;Heidelberg|49.40|8.69;Freiburg|47.99|7.85;Konstanz|47.66|9.18;Luzern|47.05|8.31;Lausanne|46.52|6.63;Innsbruck|47.26|11.39;Graz|47.07|15.44;Linz|48.31|14.29;Bologna|44.49|11.34;Verona|45.44|10.99;Pisa|43.72|10.40;Bari|41.12|16.87;Cagliari|39.22|9.12;Triëst|45.65|13.78;Grenoble|45.19|5.72;Montpellier|43.61|3.88;Rouen|49.44|1.10;Reims|49.26|4.03;Dijon|47.32|5.04;Brest|48.39|-4.49;Perpignan|42.70|2.90;Granada|37.18|-3.60;Córdoba|37.89|-4.78;Alicante|38.35|-0.48;Santander|43.46|-3.81;Santiago de Compostela|42.88|-8.54;Faro|37.02|-7.93;Palma|39.57|2.65;Dubrovnik|42.65|18.09;Aberdeen|57.15|-2.09;Inverness|57.48|-4.22;Newcastle|54.98|-1.62;Liverpool|53.41|-2.99;Leeds|53.80|-1.55;Bristol|51.45|-2.59;Plymouth|50.38|-4.14;Galway|53.27|-9.05;Limerick|52.66|-8.63;Trondheim|63.43|10.40;Tromsø|69.65|18.96;Aarhus|56.16|10.20;Odense|55.40|10.39;Turku|60.45|22.27;Tampere|61.50|23.76;Uppsala|59.86|17.64;Luleå|65.58|22.15;Stavanger|58.97|5.73;Lübeck|53.87|10.69;Kiel|54.32|10.14;Rostock|54.09|12.10;Kassel|51.32|9.50;Münster|51.96|7.63;Bonn|50.73|7.10;Würzburg|49.79|9.95;Augsburg|48.37|10.90;Regensburg|49.02|12.10;Passau|48.57|13.43";
+const parseCities = (s, tier) => s.split(';').map(x => { const a = x.split('|'); return { name: a[0], lat: +a[1], lon: +a[2], tier }; });
+const CITIES = parseCities(CITY_T1, 1).concat(parseCities(CITY_T2, 2), parseCities(CITY_T3, 3));
+let TOWNS = null; // plaatsen uit de zoeklijst, pas zichtbaar als je ver inzoomt
+function townList() {
+  if (!TOWNS) TOWNS = PLACES.filter(p => !CITIES.some(c => Math.abs(c.lat - p.lat) < 0.12 && Math.abs(c.lon - p.lon) < 0.18))
+    .map(p => ({ name: p.name.replace(/\s*\(.*\)/, ''), lat: p.lat, lon: p.lon, tier: 4 }));
+  return TOWNS;
+}
+function mapLabels(vb, px, avoid) {
+  const span = M.w / K, W = vb[2] / px, H = vb[3] / px, boxes = avoid.slice(); let out = '';
+  const free = b => !boxes.some(o => b[0] < o[0] + o[2] && b[0] + b[2] > o[0] && b[1] < o[1] + o[3] && b[1] + b[3] > o[1]);
+  const toPx = (lon, lat) => [(lon * K - vb[0]) / px, (-lat - vb[1]) / px];
+  const sw = 3 * px;
+  const placeCities = list => list.forEach(c => {
+    const q = toPx(c.lon, c.lat); if (q[0] < 0 || q[0] > W || q[1] < 0 || q[1] > H) return;
+    const fs = c.tier === 1 ? 12 : c.tier === 2 ? 11 : 10.5, w = c.name.length * fs * 0.56, left = q[0] + w + 8 > W;
+    const b = [left ? q[0] - w - 10 : q[0] - 4, q[1] - fs / 2 - 1, w + 12, fs + 3];
+    if (!free(b)) return;
+    boxes.push(b);
+    out += '<g style="pointer-events:none"><circle class="cdot" cx="' + (q[0] * px + vb[0]) + '" cy="' + (q[1] * px + vb[1]) + '" r="' + (c.tier === 1 ? 3 : 2.3) * px + '" stroke-width="' + px + '"/>' +
+      '<text class="city t' + c.tier + '" x="' + (q[0] * px + vb[0] + (left ? -5 : 5) * px) + '" y="' + (q[1] * px + vb[1] + fs * 0.35 * px) + '"' + (left ? ' text-anchor="end"' : '') + ' font-size="' + fs * px + '" stroke-width="' + sw + '">' + esc(c.name) + '</text></g>';
+  });
+  let list = [];
+  if (span <= 70) {
+    const maxTier = span <= 3 ? 4 : span <= 7 ? 3 : span <= 18 ? 2 : 1;
+    list = CITIES.filter(c => c.tier <= maxTier);
+    if (maxTier === 4) list = list.concat(townList());
+    list.sort((a, b) => a.tier - b.tier);
+  }
+  placeCities(list.filter(c => c.tier === 1));
+  if (span >= 7 && span <= 120) {
+    COUNTRIES.slice().sort((a, b) => b.c - a.c).forEach(c => {
+      const q = toPx(c.lon, c.lat); if (q[0] < -40 || q[0] > W + 40 || q[1] < -10 || q[1] > H + 10) return;
+      const fs = c.c === 3 ? 12 : 10.5, txt = c.name.toUpperCase(), w = txt.length * fs * 0.74, b = [q[0] - w / 2, q[1] - fs / 2 - 2, w, fs + 4];
+      if (q[0] < 4 || q[0] > W - 4 || !free(b)) return;
+      boxes.push(b);
+      out += '<text class="clab" x="' + (q[0] * px + vb[0]) + '" y="' + (q[1] * px + vb[1] + fs * 0.35 * px) + '" text-anchor="middle" font-size="' + fs * px + '" letter-spacing="' + 1.4 * px + '" stroke-width="' + sw + '">' + esc(txt) + '</text>';
+    });
+  }
+  placeCities(list.filter(c => c.tier > 1));
+  return out;
+}
+
+/* ---------- kaart ---------- */
+const M = { cx: 8 * K, cy: -50, w: 40 * K, fitted: false };
+const favSpots = () => S.spots.filter(s => s.fav && hasLoc(s));
+function allStops() { const a = []; S.trips.forEach(t => (t.stops || []).forEach(s => a.push(s))); return a; }
+function mapView() {
+  const nStops = new Set(allStops().map(s => norm(s.name))).size;
+  const empty = !allStops().length && !favSpots().length;
+  return '<div id="mapwrap">' +
+    '<svg id="mapsvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"><path class="land" d="' + (GEO.land || LAND_D) + '"/><path class="bord" d="' + GEO.bord + '"/><g id="lab"></g><g id="marks"></g></svg>' +
+    '<div class="mapchips"><span class="chip"><b>' + S.trips.length + '</b> reizen</span><span class="chip"><b>' + nStops + '</b> plaatsen</span>' + (favSpots().length ? '<span class="chip"><b class="heart">♥</b> ' + favSpots().length + (favSpots().length === 1 ? ' spot' : ' spots') + '</span>' : '') + '</div>' +
+    '<div class="mapctl"><button class="mapbtn" data-act="zin" aria-label="Inzoomen">+</button><button class="mapbtn" data-act="zout" aria-label="Uitzoomen">−</button><button class="mapbtn" data-act="zfit" aria-label="Alles tonen" style="font-size:16px">⌖</button></div>' +
+    (empty ? '<div class="mapempty"><b style="font-family:Fraunces,Georgia,serif;font-size:17px">' + (S.tripsLoaded ? 'Nog geen bestemmingen' : 'Laden…') + '</b>' + (S.tripsLoaded ? '<p>' + (writable() ? 'Voeg een reis met stops toe en ze verschijnen hier op de kaart.' : 'Zodra er reizen met stops zijn, zie je ze hier.') + '</p>' : '') + '</div>' : '') +
+    '<div class="mapnote">Vereenvoudigde kaart · stippellijn = luchtlijn tussen stops' + (favSpots().length ? ' · ♥ = zeker terug' : '') + '</div>' +
+    '<div id="mapcard"></div></div>';
+}
+function mapSize() { const r = $('#mapwrap').getBoundingClientRect(); return [r.width || 360, r.height || 420]; }
+function viewBox() { const s = mapSize(), h = M.w * s[1] / s[0]; return [M.cx - M.w / 2, M.cy - h / 2, M.w, h, M.w / s[0]]; }
+function fitMap() {
+  const pts = allStops().filter(s => isFinite(s.lat) && isFinite(s.lon)).concat(favSpots()).map(s => proj(s.lon, s.lat));
+  const s = mapSize();
+  if (!pts.length) { M.cx = 8 * K; M.cy = -50; M.w = Math.max(40 * K, 24 * K * s[0] / s[1] * 0.9); return; }
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+  M.cx = (minx + maxx) / 2; M.cy = (miny + maxy) / 2;
+  M.w = Math.max((maxx - minx) * 1.35, (maxy - miny) * 1.35 * s[0] / s[1], 9 * K);
+}
+function initMap() {
+  const wrap = $('#mapwrap'); if (!wrap) return;
+  loadGeo();
+  const anyPts = allStops().length || favSpots().length;
+  if (!M.fitted && anyPts) { fitMap(); M.fitted = true; }
+  else if (!anyPts) { fitMap(); }
+  drawMap(); drawCard();
+  const ptrs = new Map(); let moved = false, down = null, downT = null, lastDist = 0;
+  const dist = () => { const a = [...ptrs.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+  wrap.onpointerdown = e => {
+    if (e.target.closest('.mapctl,.mapcard')) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 1) { moved = false; down = { x: e.clientX, y: e.clientY }; downT = e.target.closest('[data-trip],[data-spot]'); }
+    else { moved = true; lastDist = dist(); }
+  };
+  wrap.onpointermove = e => {
+    const p = ptrs.get(e.pointerId); if (!p) return;
+    if (ptrs.size === 1) {
+      if (!moved) { if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) return; moved = true; try { wrap.setPointerCapture(e.pointerId); } catch (x) {} }
+      const px = viewBox()[4]; M.cx -= (e.clientX - p.x) * px; M.cy -= (e.clientY - p.y) * px;
+      p.x = e.clientX; p.y = e.clientY; drawMap();
+    } else if (ptrs.size === 2) {
+      p.x = e.clientX; p.y = e.clientY;
+      const a = [...ptrs.values()], d = dist();
+      if (lastDist) zoomAt(lastDist / d, (a[0].x + a[1].x) / 2, (a[0].y + a[1].y) / 2);
+      lastDist = d;
+    }
+  };
+  const up = e => {
+    if (!ptrs.has(e.pointerId)) return;
+    if (ptrs.size === 1 && !moved) { if (downT) { if (downT.dataset.spot) selectSpot(downT.dataset.spot); else selectTrip(downT.dataset.trip); } else if (S.selTrip || S.selSpot) { S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); } }
+    ptrs.delete(e.pointerId); lastDist = 0;
+  };
+  wrap.onpointerup = up; wrap.onpointercancel = up;
+  wrap.onwheel = e => { e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.18 : 0.85, e.clientX, e.clientY); };
+}
+function zoomAt(f, cxp, cyp) {
+  const wrap = $('#mapwrap'); if (!wrap) return;
+  const r = wrap.getBoundingClientRect(), vb = viewBox();
+  const wx = vb[0] + (cxp - r.left) * vb[4], wy = vb[1] + (cyp - r.top) * vb[4];
+  const nw = clamp(M.w * f, 0.5, 160), npx = nw / r.width, nh = nw * r.height / r.width;
+  M.cx = wx - (cxp - r.left) * npx + nw / 2; M.cy = wy - (cyp - r.top) * npx + nh / 2; M.w = nw; drawMap();
+}
+function drawMap() {
+  const svg = $('#mapsvg'); if (!svg) return;
+  const vb = viewBox(), px = vb[4];
+  svg.setAttribute('viewBox', vb[0] + ' ' + vb[1] + ' ' + vb[2] + ' ' + vb[3]);
+  const trips = S.trips.slice().sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  const latest = sortedTrips().find(t => (t.stops || []).length);
+  let lines = '', dots = '', labels = '';
+  trips.forEach(t => {
+    const c = tripColor(t), st = (t.stops || []).filter(s => isFinite(s.lat) && isFinite(s.lon)), sel = S.selTrip === t.id;
+    const P = st.map(s => proj(s.lon, s.lat));
+    if (P.length > 1) lines += '<polyline points="' + P.map(p => p[0].toFixed(3) + ',' + p[1].toFixed(3)).join(' ') + '" fill="none" stroke="' + c + '" stroke-width="' + (sel ? 3.4 : 2.2) * px + '" stroke-dasharray="' + 7 * px + ' ' + 5 * px + '" stroke-linecap="round" opacity="' + (S.selTrip && !sel ? .35 : .9) + '"/>';
+    P.forEach((p, i) => {
+      dots += '<g data-trip="' + t.id + '" style="cursor:pointer"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (sel ? 7.5 : 5.5) * px + '" fill="' + c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (S.selTrip && !sel ? .45 : 1) + '"/></g>';
+      if (sel || M.w < 22) labels += '<text x="' + (p[0] + 9 * px) + '" y="' + (p[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(st[i].name.replace(/\s*\(.*\)/, '')) + '</text>';
+    });
+  });
+  let van = '';
+  if (latest) { const st = latest.stops.filter(s => isFinite(s.lat) && isFinite(s.lon)); const l = st[st.length - 1]; if (l) { const p = proj(l.lon, l.lat); van = '<text x="' + p[0] + '" y="' + (p[1] - 10 * px) + '" font-size="' + 20 * px + '" text-anchor="middle" style="pointer-events:none">🚐</text>'; } }
+  let hearts = '', hlabels = '';
+  favSpots().forEach(s => {
+    const q = proj(s.lon, s.lat), sel = S.selSpot === s.id, r = (sel ? 11 : 9) * px;
+    hearts += '<g data-spot="' + s.id + '" style="cursor:pointer"><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + 17 * px + '" fill="transparent"/><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + r + '" fill="#c2453a" stroke="#fff" stroke-width="' + 2 * px + '"/><text x="' + q[0] + '" y="' + (q[1] + 4.2 * px) + '" font-size="' + (sel ? 13 : 11.5) * px + '" text-anchor="middle" fill="#fff" style="pointer-events:none;font-family:sans-serif">♥</text></g>';
+    if (sel || M.w < 22) hlabels += '<text x="' + (q[0] + 13 * px) + '" y="' + (q[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(s.title) + '</text>';
+  });
+  const avoid = [];
+  trips.forEach(t => (t.stops || []).filter(s => isFinite(s.lat) && isFinite(s.lon)).forEach(s => {
+    const q = proj(s.lon, s.lat), x = (q[0] - vb[0]) / px, y = (q[1] - vb[1]) / px;
+    avoid.push([x - 9, y - 22, 18, 31]);
+    if (S.selTrip === t.id || M.w < 22) avoid.push([x + 6, y - 9, String(s.name).replace(/\s*\(.*\)/, '').length * 6.6 + 8, 18]);
+  }));
+  favSpots().forEach(s => { const q = proj(s.lon, s.lat), x = (q[0] - vb[0]) / px, y = (q[1] - vb[1]) / px; avoid.push([x - 11, y - 11, 22, 22]); if (S.selSpot === s.id || M.w < 22) avoid.push([x + 10, y - 9, String(s.title).length * 6.6 + 8, 18]); });
+  const lab = $('#lab'); if (lab) lab.innerHTML = mapLabels(vb, px, avoid);
+  $('#marks').innerHTML = lines + dots + hearts + labels + hlabels + van;
+}
+function selectTrip(id) { S.selTrip = id; S.selSpot = null; drawMap(); drawCard(); }
+function selectSpot(id) { S.selSpot = id; S.selTrip = null; drawMap(); drawCard(); }
+function drawCard() {
+  const el = $('#mapcard'); if (!el) return;
+  const sp = S.selSpot ? S.spots.find(x => x.id === S.selSpot) : null;
+  if (sp) { el.innerHTML = '<div class="mapcard"><h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + sp.id + '">Bekijk spot</button></div>'; return; }
+  const t = S.trips.find(x => x.id === S.selTrip);
+  if (!t) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="mapcard"><h3>' + esc(t.title) + '</h3><div class="m">' + esc(fmtRange(t.start, t.end)) + (t.km ? ' · ' + fmtNum(t.km) + ' km' : '') + '</div><button class="small" data-act="detail" data-id="' + t.id + '">Bekijk reis</button></div>';
+}
+
+/* ---------- start ---------- */
+function nextBooking() {
+  const t = todayStr();
+  return S.bookings.filter(b => (b.end || b.start) >= t).sort((a, b) => a.start.localeCompare(b.start))[0] || null;
+}
+function homeView() {
+  const open = S.todos.filter(t => !t.done), kapot = open.filter(t => t.kind === 'kapot').length;
+  const nb = full() ? nextBooking() : null, last = sortedTrips()[0];
+  const places = new Set(allStops().map(s => norm(s.name))).size, n = S.trips.length;
+  let h = '<div class="scroll">';
+  if (full() && S.newReqCount) h += '<button class="next reqcard" data-act="openreq"><span class="k">Huuraanvraag</span><h3>' + S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') + '</h3><div class="m">Tik om te bekijken, goed te keuren of af te wijzen</div></button>';
+  if (nb) {
+    const d = diffDays(todayStr(), nb.start), when = d <= 0 ? 'Nu bezig' : d === 1 ? 'Morgen' : 'Over ' + d + ' dagen';
+    h += '<button class="next" data-act="tab" data-t="agenda"><span class="k">' + when + ' · ' + esc((KINDS[nb.kind] || KINDS.plan).label) + '</span><h3>' + esc(nb.title) + '</h3><div class="m">' + esc(fmtRange(nb.start, nb.end)) + (nb.by ? ' · ' + esc(nameOf(nb.by)) : '') + '</div></button>';
+  } else if (last) {
+    h += '<button class="next" data-act="detail" data-id="' + last.id + '"><span class="k">Laatste reis</span><h3>' + esc(last.title) + '</h3><div class="m">' + esc(fmtRange(last.start, last.end)) + (last.km ? ' · ' + fmtNum(last.km) + ' km' : '') + '</div></button>';
+  }
+  const tile = (t, title, sub, cls) => '<button class="tile' + (cls ? ' ' + cls : '') + '" data-act="tab" data-t="' + t + '">' + ICONS[t] + '<div><b>' + title + '</b><span class="s">' + esc(sub) + '</span></div></button>';
+  h += '<div class="tiles">' + tile('map', 'Kaart', places + (places === 1 ? ' plaats bezocht' : ' plaatsen bezocht')) + tile('timeline', 'Tijdlijn', n + (n === 1 ? ' reis' : ' reizen'));
+  if (full()) h += tile('agenda', 'Agenda', S.newReqCount ? S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') : (nb ? 'Volgende: ' + fmtDate(nb.start) : 'Nog niets gepland'), S.newReqCount ? 'alert' : '') + tile('todo', 'To-do', open.length ? open.length + ' open' + (kapot ? ' · ' + kapot + ' kapot' : '') : 'Alles in orde', kapot ? 'alert' : '');
+  if (full()) h += tile('spots', 'Leuke spots', S.spots.length ? S.spots.length + (S.spots.length === 1 ? ' plek bewaard' : ' plekken bewaard') + (S.spots.some(s => s.fav) ? ' · ' + S.spots.filter(s => s.fav).length + ' ♥' : '') : 'Bewaar mooie overnachtingsplekken', 'wide');
+  h += '</div>';
+  if (writable()) h += '<div class="quick"><button class="primary" data-act="newtrip">+ Nieuwe reis toevoegen</button><div class="row2"><button class="ghost" data-act="newbooking">Camper reserveren</button><button class="ghost" data-act="newtodo">To-do toevoegen</button></div><button class="ghost" data-act="copylink">Link voor klanten kopiëren</button></div>';
+  else if (S.canWrite === false) h += '<div class="roles" style="margin-top:14px">Je hebt toegang tot de kaart en de tijdlijn.</div>';
+  return h + '</div>';
+}
+
+/* ---------- to-do ---------- */
+const TODO_KINDS = {
+  kapot:   { label: 'Kapot',      color: 'var(--danger)', ph: 'bv. Waterpomp lekt' },
+  verbeter:{ label: 'Verbeteren', color: 'var(--accent)', ph: 'bv. Extra haak in de badkamer' },
+  aankoop: { label: 'Aankopen',   color: 'var(--orange)', ph: 'bv. Nieuwe gasfles' }
+};
+const PRIO = { hoog: { label: 'Dringend', rank: 0 }, normaal: { label: 'Normaal', rank: 1 }, laag: { label: 'Later', rank: 2 } };
+function todoItemHTML(t) {
+  const k = TODO_KINDS[t.kind] || TODO_KINDS.kapot;
+  return '<div class="todo' + (t.done ? ' done' : '') + '"><button class="chk" data-act="ttoggle" data-id="' + t.id + '" aria-label="' + (t.done ? 'Terug openen' : 'Afvinken') + '"' + (writable() ? '' : ' disabled') + '><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>' +
+    '<button class="tbody" data-act="edittodo" data-id="' + t.id + '"><h4>' + esc(t.title) + '</h4><div class="m"><span class="tag" style="--c:' + k.color + '">' + k.label + '</span>' +
+    (t.prio === 'hoog' && !t.done ? '<span class="tag" style="--c:var(--danger)">Dringend</span>' : '') + (t.prio === 'laag' && !t.done ? '<span>Later</span>' : '') +
+    (t.price ? '<span>' + eur(t.price) + '</span>' : '') + (t.by ? '<span>' + esc(nameOf(t.by)) + '</span>' : '') + '</div>' + (t.notes ? '<div class="n">' + esc(t.notes) + '</div>' : '') + '</button></div>';
+}
+function todoView() {
+  const open = S.todos.filter(t => !t.done), showOpen = S.todoShow === 'open';
+  const base = S.todos.filter(t => showOpen ? !t.done : !!t.done);
+  const cnt = k => k === 'alle' ? base.length : base.filter(t => t.kind === k).length;
+  const rank = t => (PRIO[t.prio] || PRIO.normaal).rank;
+  const list = base.filter(t => S.todoCat === 'alle' || t.kind === S.todoCat)
+    .sort(showOpen ? (a, b) => rank(a) - rank(b) || (b.createdAt || 0) - (a.createdAt || 0) : (a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const budget = open.reduce((s, t) => s + (+t.price || 0), 0);
+  let h = '<div class="scroll"><div class="stats three"><div class="stat"><b>' + open.length + '</b><span>open</span></div><div class="stat"><b>' + open.filter(t => t.kind === 'kapot').length + '</b><span>kapot</span></div><div class="stat"><b>' + eur(budget) + '</b><span>geschat</span></div></div>' +
+    '<div class="seg"><button class="' + (showOpen ? 'on' : '') + '" data-act="tshow" data-k="open">Open</button><button class="' + (showOpen ? '' : 'on') + '" data-act="tshow" data-k="klaar">Klaar</button></div>' +
+    '<div class="cats">' + [['alle', 'Alles']].concat(Object.keys(TODO_KINDS).map(k => [k, TODO_KINDS[k].label])).map(c => '<button class="' + (S.todoCat === c[0] ? 'on' : '') + '" data-act="tcat" data-k="' + c[0] + '">' + c[1] + ' ' + cnt(c[0]) + '</button>').join('') + '</div>';
+  if (!list.length) h += '<div class="empty"><b>' + (showOpen ? 'Niets open' : 'Nog niets afgevinkt') + '</b>' + (showOpen ? (writable() ? 'Tik op “Nieuw punt” voor iets dat stuk is, beter kan of nog gekocht moet worden.' : 'Er staan geen punten open.') : 'Afgevinkte punten verschijnen hier.') + '</div>';
+  else h += list.map(todoItemHTML).join('');
+  return h + '</div>';
+}
+const tBusy = {};
+async function toggleTodo(id) {
+  const t = S.todos.find(x => x.id === id); if (!t || tBusy[id] || !writable()) return;
+  tBusy[id] = true;
+  try { await S.db.doc('todos/' + id).update({ done: !t.done, doneAt: !t.done ? Date.now() : 0 }); if (!t.done) toast('Afgevinkt ✓'); }
+  catch (e) { dbFail(e); } finally { tBusy[id] = false; }
+}
+function openTodoForm(id) {
+  if (!writable()) { toast('Je hebt alleen leesrechten.'); return; }
+  const t = id ? S.todos.find(x => x.id === id) : null;
+  S.F = { id: id || null, kind: t ? t.kind : (S.todoCat !== 'alle' ? S.todoCat : 'kapot'), prio: t ? (t.prio || 'normaal') : 'normaal', title: t ? t.title : '', price: t && t.price ? String(t.price) : '', notes: t ? t.notes || '' : '', saving: false };
+  openSheet(todoFormHTML(), 'todoform', id);
+}
+function todoFormHTML() {
+  const F = S.F, K = TODO_KINDS[F.kind] || TODO_KINDS.kapot;
+  return '<h2>' + (F.id ? 'Punt bewerken' : 'Nieuw to-do-punt') + '</h2>' +
+    '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(TODO_KINDS).map(k => '<button style="--c:' + TODO_KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="tkind" data-k="' + k + '">' + TODO_KINDS[k].label + '</button>').join('') + '</div></div>' +
+    '<label><span class="lbl">Wat moet er gebeuren?</span><input id="todotitle" data-f="title" placeholder="' + esc(K.ph) + '" value="' + esc(F.title) + '"></label>' +
+    '<div class="field"><span class="lbl">Prioriteit</span><div class="kinds">' + Object.keys(PRIO).map(k => '<button style="--c:' + (k === 'hoog' ? 'var(--danger)' : 'var(--accent)') + '" class="' + (F.prio === k ? 'on' : '') + '" data-act="tprio" data-k="' + k + '">' + PRIO[k].label + '</button>').join('') + '</div></div>' +
+    '<label><span class="lbl">' + (F.kind === 'aankoop' ? 'Geschatte prijs (€)' : 'Geschatte kost (€, optioneel)') + '</span><input id="todoprice" type="number" inputmode="decimal" min="0" data-f="price" placeholder="0" value="' + esc(F.price) + '"></label>' +
+    '<label><span class="lbl">Notitie</span><textarea id="todonotes" data-f="notes" placeholder="Waar zit het probleem, welk onderdeel, welke winkel…">' + esc(F.notes) + '</textarea></label>' +
+    '<div class="actions">' + (F.id ? '<button class="danger" data-act="deltodo" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savetodo">Opslaan</button></div>';
+}
+async function saveTodo() {
+  const F = S.F; if (!F || F.saving) return;
+  const title = F.title.trim(); if (!title) { toast('Geef het punt een titel.'); return; }
+  F.saving = true; const btn = $('#savebtn'); btn.disabled = true;
+  try {
+    const old = F.id ? S.todos.find(x => x.id === F.id) : null;
+    const ref = F.id ? S.db.doc('todos/' + F.id) : S.db.collection('todos').doc();
+    await ref.set({ title, kind: F.kind, prio: F.prio, price: Math.max(0, parseFloat(String(F.price).replace(',', '.')) || 0), notes: F.notes.trim(),
+      done: old ? !!old.done : false, doneAt: old ? (old.doneAt || 0) : 0, by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() });
+    if (!old) { S.todoShow = 'open'; if (S.todoCat !== 'alle' && S.todoCat !== F.kind) S.todoCat = 'alle'; }
+    closeSheet(); toast(old ? 'Bijgewerkt ✓' : 'Punt toegevoegd ✓'); if (S.tab === 'todo') renderView();
+  } catch (e) { F.saving = false; btn.disabled = false; dbFail(e); }
+}
+
+/* ---------- tijdlijn ---------- */
+function timelineView() {
+  if (!S.tripsLoaded) return '<div class="scroll"><div class="empty">Laden…</div></div>';
+  const ts = sortedTrips();
+  const nights = S.trips.reduce((s, t) => s + nightsOf(t), 0);
+  const places = new Set(allStops().map(s => norm(s.name))).size;
+  let html = '<div class="scroll"><div class="stats"><div class="stat"><b>' + fmtNum(totalKm()) + '</b><span>km</span></div><div class="stat"><b>' + S.trips.length + '</b><span>reizen</span></div><div class="stat"><b>' + nights + '</b><span>nachten</span></div><div class="stat"><b>' + places + '</b><span>plaatsen</span></div></div>';
+  if (!ts.length) {
+    html += '<div class="empty"><b>Nog geen reizen</b>' + (writable() ? 'Tik op “Nieuwe reis” om jullie eerste rit vast te leggen.' : 'Er zijn nog geen reizen toegevoegd.') + '</div>';
+  } else {
+    let yr = '';
+    ts.forEach(t => {
+      const y = (t.start || '').slice(0, 4) || '—';
+      if (y !== yr) { if (yr) html += '</div>'; html += '<div class="year">' + y + '</div><div class="tl">'; yr = y; }
+      const n = nightsOf(t);
+      html += '<button class="tcard" data-act="detail" data-id="' + t.id + '" style="--c:' + tripColor(t) + '"><h3>' + esc(t.title) + '</h3><div class="tmeta">' + esc(fmtRange(t.start, t.end, true)) + (n ? ' · ' + n + (n === 1 ? ' nacht' : ' nachten') : '') + '</div><div class="pills">' +
+        (t.km ? '<span class="pill km">' + fmtNum(t.km) + ' km</span>' : '') + (t.stops || []).map(s => '<span class="pill">' + esc(s.name.replace(/\s*\(.*\)/, '')) + '</span>').join('') + '</div>' +
+        ((t.thumbs || []).length ? '<div class="thumbrow">' + t.thumbs.map(p => '<img alt="" src="' + esc(p.t) + '">').join('') + '</div>' : '') + '</button>';
+    });
+    html += '</div>';
+  }
+  return html + '</div>';
+}
+
+/* ---------- agenda ---------- */
+function eventsOn(ds) {
+  const ev = [];
+  S.bookings.forEach(b => { if (b.start <= ds && ds <= (b.end || b.start)) ev.push({ type: 'b', kind: b.kind, title: b.title, color: (KINDS[b.kind] || KINDS.plan).color, ref: b }); });
+  S.trips.forEach(t => { const a = dayOf(t.start), z = dayOf(t.end || t.start); if (a && a <= ds && ds <= z) ev.push({ type: 't', kind: 'trip', title: t.title, color: 'var(--green)', ref: t }); });
+  return ev;
+}
+function agendaView() {
+  if (S.reqTab === 'req') return requestsView();
+  const { y, m } = S.cal, first = new Date(y, m, 1), off = (first.getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate();
+  const title = first.toLocaleString('nl-BE', { month: 'long', year: 'numeric' });
+  let cells = '';
+  for (let i = 0; i < off; i++) { const d = new Date(y, m, 1 - off + i); cells += cellHTML(ymd(d), d.getDate(), true); }
+  for (let d = 1; d <= dim; d++) cells += cellHTML(ymd(new Date(y, m, d)), d, false);
+  while ((off + dim + (cells.match(/class="cell/g).length - off - dim)) % 7) { const k = cells.match(/class="cell/g).length; const d = new Date(y, m, 1 - off + k); cells += cellHTML(ymd(d), d.getDate(), true); }
+  const sel = S.cal.sel, evs = eventsOn(sel);
+  const up = S.bookings.filter(b => (b.end || b.start) >= todayStr()).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 8);
+  return '<div class="scroll">' +
+    reqSeg() + '<div class="calhead"><button class="iconbtn" data-act="cprev" aria-label="Vorige maand">‹</button><h2>' + esc(title) + '</h2><button class="iconbtn" data-act="cnext" aria-label="Volgende maand">›</button></div>' +
+    '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(d => '<span>' + d + '</span>').join('') + '</div><div class="grid">' + cells + '</div>' +
+    '<div class="legend"><span><i style="background:var(--orange)"></i>Gereserveerd</span><span><i style="background:var(--accent)"></i>Reisplan</span><span><i style="background:var(--violet)"></i>Onderhoud</span><span><i style="background:var(--green)"></i>Gereden reis</span></div>' +
+    '<div class="sec">' + esc(fmtDate(sel)) + '</div>' +
+    (evs.length ? evs.map(evHTML).join('') : '<div class="hint" style="margin:0 0 6px 2px">Niets gepland. De camper is vrij.</div>') +
+    '<div class="sec">Komende reserveringen & plannen</div>' +
+    (up.length ? up.map(b => evHTML({ type: 'b', kind: b.kind, title: b.title, color: (KINDS[b.kind] || KINDS.plan).color, ref: b })).join('') : '<div class="hint" style="margin:0 0 6px 2px">Nog niets in de agenda.</div>') + '</div>';
+}
+function cellHTML(ds, d, out) {
+  const ev = eventsOn(ds), bars = ev.slice(0, 3).map(e => '<div class="bar" style="--c:' + e.color + '"></div>').join('');
+  return '<button class="cell' + (out ? ' out' : '') + (ds === todayStr() ? ' today' : '') + (ds === S.cal.sel ? ' sel' : '') + '" data-act="selday" data-d="' + ds + '"><span class="dn">' + d + '</span>' + bars + (ev.length > 3 ? '<span class="more">+' + (ev.length - 3) + '</span>' : '') + '</button>';
+}
+function evHTML(e) {
+  const r = e.ref, isB = e.type === 'b';
+  const sub = isB ? (KINDS[r.kind] || KINDS.plan).label : 'Gereden reis';
+  const rng = isB ? fmtRange(r.start, r.end) : fmtRange(r.start, r.end);
+  return '<button class="ev" style="--c:' + e.color + '" data-act="' + (isB ? 'editbooking' : 'detail') + '" data-id="' + r.id + '"><div class="dot"></div><div style="flex:1;min-width:0"><h4>' + esc(e.title) + '</h4><div class="m">' + esc(sub) + ' · ' + esc(rng) + (r.by ? ' · ' + esc(nameOf(r.by)) : '') + '</div>' + (isB && r.notes ? '<div class="n">' + esc(r.notes) + '</div>' : '') + '</div></button>';
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html, kind, id) {
+  S.sheetKind = kind || ''; S.sheetId = id || null;
+  $('#sheet').innerHTML = '<div class="scrim" data-act="scrim"><div class="sheet" role="dialog">' + html + '</div></div>';
+}
+function closeSheet() { S.sheetKind = ''; S.sheetId = null; S.F = null; $('#sheet').innerHTML = ''; }
+
+/* trip detail */
+async function openDetail(id, soft) {
+  const t = S.trips.find(x => x.id === id);
+  if (!t) { closeSheet(); return; }
+  const sc = soft ? ($('#sheet .sheet') || {}).scrollTop : 0;
+  const n = nightsOf(t);
+  const html = '<h2>' + esc(t.title) + '</h2><div class="tmeta" style="margin-top:-6px">' + esc(fmtRange(t.start, t.end, true)) + (n ? ' · ' + n + (n === 1 ? ' nacht' : ' nachten') : '') + (t.by ? ' · toegevoegd door ' + esc(nameOf(t.by)) : '') + '</div>' +
+    '<div class="kv">' + (t.km ? '<span class="pill km">' + fmtNum(t.km) + ' km</span>' : '') + (t.stops || []).map((s, i) => '<span class="pill">' + (i + 1) + '. ' + esc(s.name) + '</span>').join('') + '</div>' +
+    (t.notes ? '<div class="notes">' + esc(t.notes) + '</div>' : '') +
+    (t.photoCount ? '<div class="lbl">Foto’s</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
+    '<div class="actions">' + (canEditItem(t) ? '<button class="danger" data-act="deltrip" data-id="' + id + '">Verwijder</button><button class="ghost" data-act="edittrip" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
+  openSheet(html, 'detail', id);
+  if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
+  if (t.photoCount && S.db) showPhotos('trips', id, t.photoCount);
+}
+
+/* ---------- spots (leuke overnachtingsplekken) ---------- */
+const spotPrice = s => s.price == null || s.price === '' ? '' : (+s.price === 0 ? 'Gratis' : eur(s.price) + ' per nacht');
+const hasLoc = s => s.lat != null && s.lon != null && isFinite(s.lat) && isFinite(s.lon);
+const spotLink = s => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(hasLoc(s) ? s.lat + ',' + s.lon : (s.place || s.title));
+const spotOpen = s => hasLoc(s) || !s.link ? spotLink(s) : s.link;
+const spotRoute = s => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(s.lat + ',' + s.lon);
+function spotCardHTML(s) {
+  const th = s.thumbs && s.thumbs[0] ? s.thumbs[0].t : '', pr = spotPrice(s);
+  return '<button class="spot" data-act="spot" data-id="' + s.id + '">' + (th ? '<img alt="" src="' + esc(th) + '">' : '<div class="noimg">⛺</div>') +
+    '<div class="sb"><h4>' + (s.fav ? '<span class="heart">♥</span> ' : '') + esc(s.title) + '</h4>' + (s.place ? '<div class="m">📍 ' + esc(s.place) + '</div>' : '') +
+    (pr ? '<div class="m"><span class="pill km">' + esc(pr) + '</span></div>' : '') + (s.notes ? '<div class="n">' + esc(s.notes) + '</div>' : '') + '</div></button>';
+}
+function spotsView() {
+  if (!S.spotsLoaded) return '<div class="scroll"><div class="empty">Laden…</div></div>';
+  const favs = S.spots.filter(s => s.fav).length;
+  const list = S.spots.filter(s => !S.spotFav || s.fav).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
+  let h = '<div class="scroll"><div class="seg"><button class="' + (S.spotFav ? '' : 'on') + '" data-act="sfilter" data-k="alle">Alle spots ' + S.spots.length + '</button><button class="' + (S.spotFav ? 'on' : '') + '" data-act="sfilter" data-k="fav">♥ Zeker terug ' + favs + '</button></div>';
+  if (!list.length) h += '<div class="empty"><b>' + (S.spotFav ? 'Nog geen favorieten' : 'Nog geen spots') + '</b>' + (S.spotFav ? 'Zet een hartje bij een spot waar jullie zeker nog eens naartoe willen.' : (writable() ? 'Tik op “Nieuwe spot” om een leuke plek om te overnachten te bewaren.' : '')) + '</div>';
+  else h += list.map(spotCardHTML).join('');
+  return h + '</div>';
+}
+async function openSpot(id, soft) {
+  const s = S.spots.find(x => x.id === id);
+  if (!s) { closeSheet(); return; }
+  const sc = soft ? ($('#sheet .sheet') || {}).scrollTop : 0, pr = spotPrice(s);
+  const html = '<h2>' + (s.fav ? '<span class="heart">♥</span> ' : '') + esc(s.title) + '</h2>' + (s.place ? '<div class="tmeta" style="margin-top:-6px">📍 ' + esc(s.place) + (s.by ? ' · toegevoegd door ' + esc(nameOf(s.by)) : '') + '</div>' : '') +
+    '<div class="kv">' + (pr ? '<span class="pill km">' + esc(pr) + '</span>' : '') + (s.fav ? '<span class="pill">Zeker terug</span>' : '') + '</div>' +
+    (s.notes ? '<div class="notes">' + esc(s.notes) + '</div>' : '') +
+    (s.photoCount ? '<div class="lbl">Foto’s</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
+    '<a class="linkbtn" href="' + esc(spotOpen(s)) + '" target="_blank" rel="noopener">Open in Google Maps</a>' + (hasLoc(s) ? '<a class="linkbtn" href="' + esc(spotRoute(s)) + '" target="_blank" rel="noopener">Route plannen</a>' : '') +
+    '<div class="actions">' + (canEditItem(s) ? '<button class="danger" data-act="delspot" data-id="' + id + '">Verwijder</button><button class="ghost" data-act="editspot" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
+  openSheet(html, 'spot', id);
+  if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
+  if (s.photoCount) showPhotos('spots', id, s.photoCount);
+}
+async function showPhotos(kind, id, count) {
+  if (!S.db) return;
+  try {
+    let list = S.photoCache[id];
+    if (!list || list.n !== count) {
+      const snap = await S.db.collection(kind + '/' + id + '/photos').get();
+      list = { n: count, items: snap.docs.map(d => ({ id: d.id, data: d.data().data, thumb: d.data().thumb, at: d.data().at || 0 })).sort((a, b) => a.at - b.at) };
+      S.photoCache[id] = list;
+    }
+    const el = $('#dphotos');
+    if (el && S.sheetId === id) el.innerHTML = list.items.map(p => '<img alt="" src="' + esc(p.thumb || p.data) + '" data-act="lightbox" data-id="' + id + '" data-p="' + p.id + '">').join('');
+  } catch (e) { const el = $('#dphotos'); if (el) el.innerHTML = '<div class="hint err">Foto’s laden is niet gelukt.</div>'; }
+}
+async function openSpotForm(id) {
+  if (!writable()) { toast('Je hebt alleen leesrechten.'); return; }
+  const s = id ? S.spots.find(x => x.id === id) : null;
+  S.F = { id: id || null, title: s ? s.title : '', place: s ? s.place || '' : '', lat: s && s.lat != null ? s.lat : null, lon: s && s.lon != null ? s.lon : null, locFor: s ? s.place || '' : '',
+    price: s && s.price != null ? String(s.price) : '', notes: s ? s.notes || '' : '', fav: !!(s && s.fav), link: s && s.link || '', newPhotos: [], existing: [], remove: {}, saving: false };
+  openSheet('<h2>' + (s ? 'Spot bewerken' : 'Nieuwe spot') + '</h2>' +
+    '<label><span class="lbl">Naam van de plek</span><input id="spottitle" data-f="title" placeholder="bv. Camperplaats aan het meer" value="' + esc(S.F.title) + '"></label>' +
+    '<div class="field"><span class="lbl">Locatie</span><button class="locbtn" id="spotlocbtn" data-act="spotmap">' + locBtnHTML(S.F) + '</button></div>' +
+    '<label><span class="lbl">Prijs per nacht (€)</span><input id="spotprice" type="number" inputmode="decimal" min="0" data-f="price" placeholder="Leeg = onbekend, 0 = gratis" value="' + esc(S.F.price) + '"></label>' +
+    '<label><span class="lbl">Beschrijving</span><textarea id="spotnotes" data-f="notes" placeholder="Wat maakt de plek leuk? Uitzicht, voorzieningen, tips…">' + esc(S.F.notes) + '</textarea></label>' +
+    '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
+    '<div class="field"><button class="favbtn' + (S.F.fav ? ' on' : '') + '" id="favbtn" data-act="spotfav">' + (S.F.fav ? '♥ Zeker nog eens naartoe' : '♡ Zeker nog eens naartoe?') + '</button></div>' +
+    '<div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="primary" id="savebtn" data-act="savespot">Opslaan</button></div>', 'spotform', id);
+  renderPhotos();
+  if (s && s.photoCount && S.db) {
+    try {
+      const snap = await S.db.collection('spots/' + id + '/photos').get();
+      if (S.F && S.F.id === id) { S.F.existing = snap.docs.map(d => ({ id: d.id, thumb: d.data().thumb || d.data().data, at: d.data().at || 0 })).sort((a, b) => a.at - b.at); renderPhotos(); }
+    } catch (e) {}
+  }
+}
+/* ---------- locatie kiezen: zoeken, plakken, kaart ---------- */
+async function fetchJson(url, ms) {
+  const c = window.AbortController ? new AbortController() : null, t = setTimeout(() => { if (c) c.abort(); }, ms || 8000);
+  try { const r = await fetch(url, c ? { signal: c.signal } : {}); if (!r.ok) throw new Error('http'); return await r.json(); } finally { clearTimeout(t); }
+}
+// leest coördinaten uit "50.35, 5.46" of uit een Google Maps-link
+function parseLoc(text) {
+  const t = String(text || '').trim(); if (!t) return null;
+  const ok = (a, b) => { a = parseFloat(a); b = parseFloat(b); return isFinite(a) && isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 ? { lat: a, lon: b } : null; };
+  let m = t.match(/^\(?\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*\)?$/);
+  if (m) { const r = ok(m[1].replace(',', '.'), m[2].replace(',', '.')); if (r) return r; }
+  if (/^https?:\/\//i.test(t)) {
+    let u = t; try { u = decodeURIComponent(t); } catch (e) {}
+    m = u.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || u.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || u.match(/[?&](?:q|ll|query|center|destination|daddr)=(-?\d+(?:\.\d+)?)[,+ ]\s*(-?\d+(?:\.\d+)?)/);
+    if (m) return ok(m[1], m[2]);
+    return 'short';
+  }
+  return null;
+}
+const shortLabel = parts => { const o = []; parts.filter(Boolean).forEach(x => { if (o[o.length - 1] !== x && o.indexOf(x) < 0) o.push(x); }); return o.join(', '); };
+async function searchPlaces(q) {
+  const out = [], seen = new Set(), add = (label, lat, lon) => { lat = +lat; lon = +lon; if (!label || !isFinite(lat) || !isFinite(lon)) return; const k = lat.toFixed(3) + ',' + lon.toFixed(3); if (seen.has(k)) return; seen.add(k); out.push({ label, lat, lon }); };
+  let failed = 0;
+  try {
+    const j = await fetchJson('https://photon.komoot.io/api/?limit=6&lang=en&lat=50.6&lon=4.6&q=' + encodeURIComponent(q));
+    (j.features || []).forEach(f => { const p = f.properties || {}, c = (f.geometry || {}).coordinates || []; add(shortLabel([p.name, p.street ? p.street + (p.housenumber ? ' ' + p.housenumber : '') : '', p.city || p.district || p.county, p.country]), c[1], c[0]); });
+  } catch (e) { failed++; }
+  if (!out.length) {
+    try {
+      const j = await fetchJson('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=nl&q=' + encodeURIComponent(q));
+      (j || []).forEach(x => { const p = String(x.display_name || '').split(', '); add(shortLabel([p[0], p.length > 3 ? p[1] : '', p[p.length - 1]]), x.lat, x.lon); });
+    } catch (e) { failed++; }
+  }
+  if (!out.length && failed === 2) throw new Error('net');
+  return out;
+}
+async function reverseName(lat, lon) {
+  try {
+    const j = await fetchJson('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=nl&lat=' + lat + '&lon=' + lon, 6000), a = j.address || {};
+    return shortLabel([j.name || a.tourism || a.amenity || '', a.village || a.town || a.city || a.hamlet || a.municipality || '', a.country || '']) || '';
+  } catch (e) { return ''; }
+}
+function locBtnHTML(F) {
+  if (F.lat == null || F.lon == null) return '<span class="lt">🗺️ Kies de locatie op de kaart</span><span class="ls">Zoek of tik op de plek</span>';
+  return '<span class="lt">📍 ' + esc(F.place || 'Gekozen locatie') + '</span><span class="ls">' + (+F.lat).toFixed(4) + ', ' + (+F.lon).toFixed(4) + ' · tik om te wijzigen</span>';
+}
+function setSpotLoc(lat, lon, label) {
+  const F = S.F; if (!F) return;
+  F.lat = +lat; F.lon = +lon;
+  if (label != null) F.place = label;
+  F.locFor = F.place.trim();
+  const b = $('#spotlocbtn'); if (b) b.innerHTML = locBtnHTML(F);
+}
+async function nameFromCoords(lat, lon, label) {
+  const F = S.F; if (!F) return;
+  if (label) { setSpotLoc(lat, lon, label); return; }
+  const hold = 'Locatie ' + (+lat).toFixed(3) + ', ' + (+lon).toFixed(3);
+  setSpotLoc(lat, lon, hold);
+  const n = await reverseName(lat, lon);
+  if (n && S.F === F && F.place === hold && F.lat === +lat) { F.place = n; F.locFor = n; const b = $('#spotlocbtn'); if (b) b.innerHTML = locBtnHTML(F); }
+}
+// deelt-tekst van Google Maps: "Naam\nhttps://maps.app.goo.gl/…" → { url, name }
+function splitShare(text) {
+  const t = String(text || ''), m = t.match(/https?:\/\/[^\s<>"']+/i); if (!m) return { url: '', name: '' };
+  const url = m[0].replace(/[.,;)]+$/, ''), rest = t.replace(m[0], ' ').split(/\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean)[0] || '';
+  return { url, name: rest.length <= 80 ? rest : '' };
+}
+const urlIn = s => splitShare(s).url;
+async function resolveMapLink(url) { const p = parseLoc(url); return p && p !== 'short' ? p : null; }
+let repaired = false;
+async function repairSpots() {
+  if (repaired || !writable()) return; repaired = true;
+  const todo = S.spots.filter(s => !hasLoc(s) && (s.link || urlIn(s.place) || urlIn(s.notes) || urlIn(s.title)));
+  let fixed = 0;
+  for (const s of todo) {
+    try {
+      const url = s.link || urlIn(s.place) || urlIn(s.notes) || urlIn(s.title), sh = splitShare(s.place || ''), r = await resolveMapLink(url), patch = {};
+      if (!s.link) patch.link = url;
+      if (r) { patch.lat = r.lat; patch.lon = r.lon; fixed++; }
+      if (urlIn(s.place)) patch.place = sh.name || (r ? (await reverseName(r.lat, r.lon)) : '') || 'Google Maps-locatie';
+      if (Object.keys(patch).length) await S.db.doc('spots/' + s.id).update(patch);
+    } catch (e) {}
+  }
+  if (fixed) toast(fixed === 1 ? '1 spot kreeg een punt op de kaart ✓' : fixed + ' spots kregen een punt op de kaart ✓');
+}
+/* kaartkiezer (OpenStreetMap-tegels, geen sleutel nodig) */
+const TILE = 256;
+const mx = (lon, z) => (lon + 180) / 360 * Math.pow(2, z) * TILE;
+const my = (lat, z) => { const s = Math.sin(clamp(lat, -85, 85) * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * Math.pow(2, z) * TILE; };
+const ilon = (x, z) => x / (Math.pow(2, z) * TILE) * 360 - 180;
+const ilat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / (Math.pow(2, z) * TILE); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
+function openPicker() {
+  const F = S.F; if (!F || $('.picker')) return;
+  const el = document.createElement('div'); el.className = 'picker';
+  el.innerHTML = '<div class="pkbar"><button class="pkx" data-pk="close" aria-label="Terug">←</button><input id="pksearch" placeholder="Zoek een plaats of adres…" autocomplete="off"><div class="pksugs" id="pksugs"></div></div>' +
+    '<div class="pkmap" id="pkmap"><div class="pkpin" id="pkpin" hidden>📍</div><div class="pkctl"><button data-pk="zin" aria-label="Inzoomen">+</button><button data-pk="zout" aria-label="Uitzoomen">−</button><button data-pk="gps" aria-label="Mijn locatie">⌖</button></div><div class="pkattr">© OpenStreetMap</div></div>' +
+    '<div class="pkfoot"><span id="pkinfo">Tik op de kaart om de plek te kiezen</span><button class="primary" id="pkok" data-pk="ok" disabled>Gebruik deze locatie</button></div>';
+  document.body.appendChild(el);
+  const map = el.querySelector('#pkmap'), pinEl = el.querySelector('#pkpin'), ok = el.querySelector('#pkok'), info = el.querySelector('#pkinfo');
+  const P = { lat: 50.6, lon: 4.6, z: 6, pin: null };
+  if (F.lat != null && F.lon != null) { P.lat = +F.lat; P.lon = +F.lon; P.z = 13; P.pin = { lat: +F.lat, lon: +F.lon }; }
+  else { const l = allStops().filter(s => isFinite(s.lat) && isFinite(s.lon)).pop(); if (l) { P.lat = l.lat; P.lon = l.lon; P.z = 7; } }
+  el._P = P;
+  const tiles = new Map(), size = () => { const r = map.getBoundingClientRect(); return [r.width || 360, r.height || 480]; };
+  function draw() {
+    const [w, h] = size(), z = P.z, n = Math.pow(2, z), x0 = mx(P.lon, z) - w / 2, y0 = my(P.lat, z) - h / 2, need = new Set();
+    for (let ty = Math.floor(y0 / TILE); ty <= Math.floor((y0 + h) / TILE); ty++) {
+      if (ty < 0 || ty >= n) continue;
+      for (let tx = Math.floor(x0 / TILE); tx <= Math.floor((x0 + w) / TILE); tx++) {
+        const wx = ((tx % n) + n) % n, key = z + '/' + wx + '/' + ty + '@' + tx; need.add(key);
+        let im = tiles.get(key);
+        if (!im) { im = document.createElement('img'); im.alt = ''; im.draggable = false; im.src = 'https://tile.openstreetmap.org/' + z + '/' + wx + '/' + ty + '.png'; map.insertBefore(im, map.firstChild); tiles.set(key, im); }
+        im.style.left = (tx * TILE - x0) + 'px'; im.style.top = (ty * TILE - y0) + 'px';
+      }
+    }
+    tiles.forEach((im, k) => { if (!need.has(k)) { im.remove(); tiles.delete(k); } });
+    if (P.pin) { pinEl.hidden = false; pinEl.style.left = (mx(P.pin.lon, z) - x0) + 'px'; pinEl.style.top = (my(P.pin.lat, z) - y0) + 'px'; } else pinEl.hidden = true;
+  }
+  const geoAt = (px, py) => { const [w, h] = size(), z = P.z; return { lon: ilon(mx(P.lon, z) - w / 2 + px, z), lat: ilat(my(P.lat, z) - h / 2 + py, z) }; };
+  function zoomTo(nz, px, py) {
+    nz = clamp(nz, 3, 18); if (nz === P.z) return;
+    const [w, h] = size(); if (px == null) { px = w / 2; py = h / 2; }
+    const g = geoAt(px, py); P.z = nz; P.lon = ilon(mx(g.lon, nz) - px + w / 2, nz); P.lat = clamp(ilat(my(g.lat, nz) - py + h / 2, nz), -84, 84); draw();
+  }
+  function setPin(lat, lon, label) { P.pin = { lat, lon }; P.label = label || null; ok.disabled = false; info.textContent = lat.toFixed(5) + ', ' + lon.toFixed(5); draw(); }
+  el._setPin = setPin; el._draw = draw;
+  if (P.pin) setPin(P.pin.lat, P.pin.lon); else draw();
+  const ptrs = new Map(); let moved = false, start = null, pd = 0, lastWheel = 0;
+  const local = e => { const r = map.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const dist = () => { const a = [...ptrs.values()]; return Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]); };
+  map.addEventListener('pointerdown', e => {
+    if (e.target.closest('.pkctl')) return;
+    ptrs.set(e.pointerId, local(e));
+    if (ptrs.size === 1) { moved = false; start = local(e); } else { moved = true; pd = dist(); }
+  });
+  map.addEventListener('pointermove', e => {
+    const old = ptrs.get(e.pointerId); if (!old) return; const cur = local(e);
+    if (ptrs.size === 1) {
+      if (!moved && Math.hypot(cur[0] - start[0], cur[1] - start[1]) < 6) return;
+      if (!moved) { moved = true; try { map.setPointerCapture(e.pointerId); } catch (x) {} }
+      const z = P.z; P.lon = ilon(mx(P.lon, z) - (cur[0] - old[0]), z); P.lat = clamp(ilat(my(P.lat, z) - (cur[1] - old[1]), z), -84, 84); ptrs.set(e.pointerId, cur); draw();
+    } else if (ptrs.size === 2) {
+      ptrs.set(e.pointerId, cur); const a = [...ptrs.values()], d = dist(), mid = [(a[0][0] + a[1][0]) / 2, (a[0][1] + a[1][1]) / 2];
+      if (d > pd * 1.6) { zoomTo(P.z + 1, mid[0], mid[1]); pd = d; } else if (d < pd * 0.62) { zoomTo(P.z - 1, mid[0], mid[1]); pd = d; }
+    }
+  });
+  const up = e => { if (!ptrs.has(e.pointerId)) return; if (ptrs.size === 1 && !moved) { const c = local(e), g = geoAt(c[0], c[1]); setPin(g.lat, g.lon); } ptrs.delete(e.pointerId); };
+  map.addEventListener('pointerup', up); map.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); });
+  map.addEventListener('wheel', e => { e.preventDefault(); const now = Date.now(); if (now - lastWheel < 200) return; lastWheel = now; const c = local(e); zoomTo(P.z + (e.deltaY < 0 ? 1 : -1), c[0], c[1]); }, { passive: false });
+  let pt = null, pseq = 0;
+  el.querySelector('#pksearch').addEventListener('input', e => {
+    const q = e.target.value.trim(), box = el.querySelector('#pksugs'), seq = ++pseq; clearTimeout(pt); box.innerHTML = '';
+    const sh = splitShare(q), pl = parseLoc(sh.url || q);
+    if (pl && pl !== 'short') { P.lat = pl.lat; P.lon = pl.lon; P.z = 15; setPin(pl.lat, pl.lon, sh.name || null); return; }
+    if (pl === 'short') { box.innerHTML = '<div class="hint err">Korte Google-links kan ik niet lezen. ' + (sh.name ? 'Ik zoek op de naam.' : 'Zoek op naam of tik op de kaart.') + '</div>'; if (!sh.name) return; }
+    const qq = pl === 'short' ? sh.name : q; if (qq.length < 3) return;
+    const loc = matches(qq).slice(0, 3).map(p => ({ label: p.name, lat: p.lat, lon: p.lon }));
+    const show = list => { box.innerHTML = list.map((s, i) => '<button data-i="' + i + '">' + esc(s.label) + '</button>').join(''); box._list = list; };
+    show(loc);
+    pt = setTimeout(async () => { try { const r = await searchPlaces(qq); if (seq === pseq) show(loc.concat(r).slice(0, 7)); } catch (x) { if (seq === pseq && !loc.length) box.innerHTML = '<div class="hint err">Zoeken lukt nu niet.</div>'; } }, 450);
+  });
+  el.querySelector('#pksugs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const s = e.currentTarget._list[+b.dataset.i]; if (!s) return; P.lat = s.lat; P.lon = s.lon; P.z = 14; e.currentTarget.innerHTML = ''; el.querySelector('#pksearch').value = s.label; setPin(s.lat, s.lon, s.label); });
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-pk]'); if (!b) return; const k = b.dataset.pk;
+    if (k === 'close') el.remove();
+    else if (k === 'zin') zoomTo(P.z + 1); else if (k === 'zout') zoomTo(P.z - 1);
+    else if (k === 'gps') {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(p => { P.lat = p.coords.latitude; P.lon = p.coords.longitude; P.z = 15; setPin(P.lat, P.lon); }, () => { info.textContent = 'Geen toegang tot je locatie.'; }, { enableHighAccuracy: true, timeout: 12000 });
+    } else if (k === 'ok' && P.pin) { const pin = P.pin; el.remove(); if (S.F === F) nameFromCoords(pin.lat, pin.lon, P.label); }
+  });
+}
+
+async function saveSpot() {
+  const F = S.F; if (!F || F.saving) return;
+  const title = F.title.trim(); if (!title) { toast('Geef de plek een naam.'); return; }
+  if (F.lat == null || F.lon == null) { toast('Kies eerst de locatie op de kaart.'); return; }
+  F.saving = true; const btn = $('#savebtn'); btn.disabled = true; btn.textContent = 'Opslaan…';
+  try {
+    const place = F.place.trim() || 'Gekozen locatie';
+    const old = F.id ? S.spots.find(x => x.id === F.id) : null;
+    const ref = F.id ? S.db.doc('spots/' + F.id) : S.db.collection('spots').doc(), id = ref.id;
+    let thumbs = old && old.thumbs ? old.thumbs.slice() : [], count = old && old.photoCount ? old.photoCount : 0;
+    for (const pid of Object.keys(F.remove)) { if (!F.remove[pid]) continue; await S.db.doc('spots/' + id + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
+    for (let i = 0; i < F.newPhotos.length; i++) {
+      btn.textContent = 'Foto ' + (i + 1) + '/' + F.newPhotos.length + '…';
+      const p = F.newPhotos[i], pr = S.db.collection('spots/' + id + '/photos').doc();
+      await pr.set({ data: p.full, thumb: p.thumb, at: Date.now() + i, by: S.me ? S.me.id : null });
+      count++; if (thumbs.length < 4) thumbs.push({ id: pr.id, t: p.thumb });
+    }
+    delete S.photoCache[id];
+    const pv = parseFloat(String(F.price).replace(',', '.'));
+    await ref.set({ title, place, lat: F.lat != null ? +F.lat : null, lon: F.lon != null ? +F.lon : null, price: isFinite(pv) && pv >= 0 ? pv : null, notes: F.notes.trim(), fav: !!F.fav, link: F.link || null, thumbs, photoCount: count,
+      by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() });
+    closeSheet(); toast(old ? 'Spot bijgewerkt' : 'Spot bewaard ✓');
+  } catch (e) { F.saving = false; btn.disabled = false; btn.textContent = 'Opslaan'; dbFail(e); }
+}
+async function deleteSpot(id) {
+  try {
+    const snap = await S.db.collection('spots/' + id + '/photos').get();
+    for (const d of snap.docs) await S.db.doc('spots/' + id + '/photos/' + d.id).delete();
+    await S.db.doc('spots/' + id).delete();
+    delete S.photoCache[id]; closeSheet(); toast('Spot verwijderd');
+  } catch (e) { dbFail(e); }
+}
+function openGallery(items, start) {
+  const old = $('.lightbox'); if (old) old.remove();
+  const el = document.createElement('div'); el.className = 'lightbox';
+  el.innerHTML = '<div class="lbtrack">' + items.map(p => '<div class="lbslide"><img alt="" src="' + esc(p.data) + '"></div>').join('') + '</div><button class="lbclose" aria-label="Sluiten">✕</button>' +
+    (items.length > 1 ? '<div class="lbcount"></div><button class="lbnav prev" aria-label="Vorige foto">‹</button><button class="lbnav next" aria-label="Volgende foto">›</button>' : '');
+  document.body.appendChild(el);
+  const tr = el.querySelector('.lbtrack'), idx = () => Math.round(tr.scrollLeft / (tr.clientWidth || 1));
+  const upd = () => { const c = el.querySelector('.lbcount'); if (c) c.textContent = (idx() + 1) + ' / ' + items.length; };
+  el._go = d => { const i = clamp(idx() + d, 0, items.length - 1); tr.scrollTo({ left: i * tr.clientWidth, behavior: 'smooth' }); };
+  tr.scrollLeft = clamp(start, 0, items.length - 1) * tr.clientWidth; upd();
+  tr.addEventListener('scroll', upd);
+  el.addEventListener('click', e => {
+    if (e.target.closest('.lbclose')) el.remove();
+    else if (e.target.closest('.prev')) el._go(-1);
+    else if (e.target.closest('.next')) el._go(1);
+    else if (!e.target.closest('img') && !e.target.closest('.lbcount')) el.remove();
+  });
+}
+
+/* trip form */
+async function openTripForm(id) {
+  const t = id ? S.trips.find(x => x.id === id) : null;
+  S.F = { id: id || null, title: t ? t.title : '', start: t ? t.start || '' : '', end: t ? t.end || '' : '', km: t && t.km ? String(t.km) : '', notes: t ? t.notes || '' : '',
+    stops: t ? (t.stops || []).map(s => Object.assign({}, s)) : [], newPhotos: [], existing: [], remove: {}, saving: false };
+  if (!t) { const d = new Date(); d.setMinutes(0, 0, 0); S.F.start = ymd(d) + 'T' + pad(d.getHours()) + ':00'; }
+  const html = '<h2>' + (t ? 'Reis bewerken' : 'Nieuwe reis') + '</h2>' +
+    '<label><span class="lbl">Titel</span><input data-f="title" placeholder="bv. Weekend Ardennen" value="' + esc(S.F.title) + '"></label>' +
+    '<div class="row2"><label><span class="lbl">Vertrek</span><input type="datetime-local" data-f="start" value="' + esc(S.F.start) + '"></label><label><span class="lbl">Terug</span><input type="datetime-local" data-f="end" value="' + esc(S.F.end) + '"></label></div>' +
+    '<label><span class="lbl">Gereden kilometers</span><input type="number" inputmode="decimal" min="0" data-f="km" placeholder="bv. 412" value="' + esc(S.F.km) + '"></label>' +
+    '<div class="field"><span class="lbl">Bestemmingen (in volgorde)</span><div id="stops"></div>' +
+    '<div class="addstop"><input id="stopname" placeholder="Zoek een plaats…" autocomplete="off"><button class="small" data-act="addstop">Toevoegen</button></div>' +
+    '<div class="sugs" id="sugs"></div>' +
+    '<div class="mini"><button data-act="gps">📍 Mijn locatie</button></div>' +
+    '<details><summary>Coördinaten zelf invoeren</summary><div class="row2" style="margin-top:8px"><input id="clat" inputmode="decimal" placeholder="Breedtegraad (bv. 50.85)"><input id="clon" inputmode="decimal" placeholder="Lengtegraad (bv. 4.35)"></div><button class="small" style="margin-top:8px" data-act="addcoord">Stop met coördinaten toevoegen</button></details>' +
+    '<div class="hint" id="stopmsg"></div></div>' +
+    '<label><span class="lbl">Notities</span><textarea data-f="notes" placeholder="Wat willen jullie onthouden?">' + esc(S.F.notes) + '</textarea></label>' +
+    '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
+    '<div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="primary" id="savebtn" data-act="savetrip">Opslaan</button></div>';
+  openSheet(html, 'form', id);
+  renderStops(); renderPhotos();
+  if (t && t.photoCount && S.db) {
+    try {
+      const snap = await S.db.collection('trips/' + id + '/photos').get();
+      if (S.F && S.F.id === id) { S.F.existing = snap.docs.map(d => ({ id: d.id, thumb: d.data().thumb || d.data().data, at: d.data().at || 0 })).sort((a, b) => a.at - b.at); renderPhotos(); }
+    } catch (e) {}
+  }
+}
+function renderStops() {
+  const el = $('#stops'); if (!el || !S.F) return;
+  el.innerHTML = S.F.stops.map((s, i) => '<div class="stoprow"><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(s.name) + '<small>' + s.lat.toFixed(3) + ', ' + s.lon.toFixed(3) + '</small></div><button data-act="stopup" data-i="' + i + '" aria-label="Omhoog"' + (i === 0 ? ' disabled style="opacity:.3"' : '') + '>↑</button><button data-act="stopdel" data-i="' + i + '" aria-label="Verwijder">✕</button></div>').join('');
+}
+function renderPhotos() {
+  const el = $('#photos'); if (!el || !S.F) return;
+  const ex = S.F.existing.map(p => '<div class="ph' + (S.F.remove[p.id] ? ' gone' : '') + '"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phtoggle" data-id="' + p.id + '" aria-label="Verwijder foto">' + (S.F.remove[p.id] ? '↺' : '✕') + '</button></div>').join('');
+  const nw = S.F.newPhotos.map((p, i) => '<div class="ph"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phdel" data-i="' + i + '" aria-label="Verwijder foto">✕</button></div>').join('');
+  el.innerHTML = ex + nw;
+}
+function stopMsg(msg, err) { const el = $('#stopmsg'); if (el) { el.textContent = msg || ''; el.className = 'hint' + (err ? ' err' : ''); } }
+function addStop(name, lat, lon) {
+  if (!S.F) return;
+  if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { stopMsg('Ongeldige coördinaten.', true); return; }
+  S.F.stops.push({ name: String(name).trim() || (lat.toFixed(2) + ', ' + lon.toFixed(2)), lat: +lat, lon: +lon });
+  const inp = $('#stopname'); if (inp) inp.value = ''; const sg = $('#sugs'); if (sg) sg.innerHTML = '';
+  stopMsg(''); renderStops();
+}
+function matches(q) { const n = norm(q).trim(); if (!n) return []; const a = PLACES.filter(p => p.n.startsWith(n)), b = PLACES.filter(p => !p.n.startsWith(n) && p.n.includes(n)); return a.concat(b).slice(0, 6); }
+async function geocode(q) {
+  const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=nl&q=' + encodeURIComponent(q));
+  if (!r.ok) throw new Error('geo');
+  const a = await r.json();
+  if (!a.length) return null;
+  const x = a[0];
+  return { name: String(x.display_name || q).split(',').slice(0, 2).join(',').trim(), lat: +x.lat, lon: +x.lon };
+}
+async function addStopFromInput() {
+  const inp = $('#stopname'), q = inp ? inp.value.trim() : ''; if (!q) { stopMsg('Typ eerst een plaatsnaam.', true); return; }
+  const m = matches(q);
+  if (m.length) { addStop(m[0].name, m[0].lat, m[0].lon); return; }
+  stopMsg('Plaats opzoeken…');
+  try {
+    const g = await geocode(q);
+    if (g) { addStop(g.name, g.lat, g.lon); return; }
+    stopMsg('Plaats niet gevonden. Probeer een andere schrijfwijze of vul de coördinaten in.', true);
+  } catch (e) { stopMsg('Opzoeken lukte niet. Controleer je verbinding of vul de coördinaten in.', true); }
+}
+function gps() {
+  if (!navigator.geolocation) { stopMsg('Locatie wordt niet ondersteund op dit toestel.', true); return; }
+  stopMsg('Locatie bepalen…');
+  navigator.geolocation.getCurrentPosition(p => {
+    const inp = $('#stopname'), nm = inp && inp.value.trim();
+    addStop(nm || 'Huidige locatie', p.coords.latitude, p.coords.longitude);
+  }, () => stopMsg('Geen toegang tot je locatie. Geef toestemming in je browser of kies een plaats.', true), { enableHighAccuracy: true, timeout: 12000 });
+}
+function loadImg(file) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); res(i); }; i.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; i.src = u; }); }
+function shrink(img, max, q) { const s = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q); }
+async function prep(file) { const img = await loadImg(file); let full = shrink(img, 1100, .72); if (full.length > 215000) full = shrink(img, 900, .6); if (full.length > 215000) full = shrink(img, 700, .5); return { full, thumb: shrink(img, 220, .6) }; }
+
+async function saveTrip() {
+  const F = S.F; if (!F || F.saving) return;
+  const title = F.title.trim(); if (!title) { toast('Geef de reis een titel.'); return; }
+  if (!F.start) { toast('Vul een vertrekdatum in.'); return; }
+  if (F.end && F.end < F.start) { toast('“Terug” ligt voor “Vertrek”.'); return; }
+  F.saving = true; const btn = $('#savebtn'); btn.disabled = true; btn.textContent = 'Opslaan…';
+  try {
+    const old = F.id ? S.trips.find(x => x.id === F.id) : null;
+    const ref = F.id ? S.db.doc('trips/' + F.id) : S.db.collection('trips').doc();
+    const id = ref.id;
+    let thumbs = old && old.thumbs ? old.thumbs.slice() : [], count = old && old.photoCount ? old.photoCount : 0;
+    for (const pid of Object.keys(F.remove)) { if (!F.remove[pid]) continue; await S.db.doc('trips/' + id + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
+    for (let i = 0; i < F.newPhotos.length; i++) {
+      btn.textContent = 'Foto ' + (i + 1) + '/' + F.newPhotos.length + '…';
+      const p = F.newPhotos[i], pr = S.db.collection('trips/' + id + '/photos').doc();
+      await pr.set({ data: p.full, thumb: p.thumb, at: Date.now() + i, by: S.me ? S.me.id : null });
+      count++; if (thumbs.length < 4) thumbs.push({ id: pr.id, t: p.thumb });
+    }
+    delete S.photoCache[id];
+    const doc = { title, start: F.start, end: F.end || '', km: Math.max(0, parseFloat(String(F.km).replace(',', '.')) || 0), notes: F.notes.trim(), stops: F.stops, thumbs, photoCount: count,
+      by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() };
+    await ref.set(doc);
+    closeSheet(); toast(old ? 'Reis bijgewerkt' : 'Reis opgeslagen ✓');
+    M.fitted = false; S.selTrip = null;
+  } catch (e) { F.saving = false; btn.disabled = false; btn.textContent = 'Opslaan'; dbFail(e); }
+}
+async function deleteTrip(id) {
+  try {
+    const snap = await S.db.collection('trips/' + id + '/photos').get();
+    for (const d of snap.docs) await S.db.doc('trips/' + id + '/photos/' + d.id).delete();
+    await S.db.doc('trips/' + id).delete();
+    delete S.photoCache[id]; if (S.selTrip === id) S.selTrip = null;
+    closeSheet(); toast('Reis verwijderd');
+  } catch (e) { dbFail(e); }
+}
+function confirmSheet(msg, yesLabel, act, id) {
+  openSheet('<h2>Zeker weten?</h2><p style="margin:0 0 4px">' + esc(msg) + '</p><div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="danger" data-act="' + act + '" data-id="' + esc(id) + '">' + esc(yesLabel) + '</button></div>', 'confirm');
+}
+
+/* booking form */
+function openBookingForm(id, presetDate) {
+  const b = id ? S.bookings.find(x => x.id === id) : null;
+  if (b && !canEditItem(b)) { toast('Alleen de maker of een beheerder kan dit aanpassen.'); return; }
+  const d = presetDate || S.cal.sel || todayStr();
+  S.F = { id: id || null, title: b ? b.title : '', kind: b ? b.kind : 'reservering', start: b ? b.start : d, end: b ? (b.end || b.start) : d, notes: b ? b.notes || '' : '', warned: false, saving: false };
+  openSheet(bookingHTML(), 'booking', id);
+}
+function bookingHTML() {
+  const F = S.F;
+  return '<h2>' + (F.id ? 'Boeking bewerken' : 'Camper reserveren / plannen') + '</h2>' +
+    '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(KINDS).map(k => '<button style="--c:' + KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="kind" data-k="' + k + '">' + KINDS[k].label + '</button>').join('') + '</div></div>' +
+    '<label><span class="lbl">Titel</span><input data-f="title" placeholder="' + (F.kind === 'onderhoud' ? 'bv. Keuring' : 'bv. Pinksteren naar de Ardennen') + '" value="' + esc(F.title) + '"></label>' +
+    '<div class="row2"><label><span class="lbl">Van</span><input type="date" data-f="start" value="' + esc(F.start) + '"></label><label><span class="lbl">Tot en met</span><input type="date" data-f="end" value="' + esc(F.end) + '"></label></div>' +
+    '<label><span class="lbl">Notitie</span><textarea data-f="notes" placeholder="Wie gaat mee, wat is de bedoeling…">' + esc(F.notes) + '</textarea></label>' +
+    '<div id="conflict"></div>' +
+    '<div class="actions">' + (F.id ? '<button class="danger" data-act="delbooking" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
+}
+function conflictsFor(F) {
+  if (F.kind === 'plan') return [];
+  return S.bookings.filter(b => b.id !== F.id && b.kind !== 'plan' && b.start <= F.end && F.start <= (b.end || b.start));
+}
+async function saveBooking() {
+  const F = S.F; if (!F || F.saving) return;
+  const title = F.title.trim(); if (!title) { toast('Geef de boeking een titel.'); return; }
+  if (!F.start || !F.end) { toast('Vul de datums in.'); return; }
+  if (F.end < F.start) { toast('“Tot en met” ligt voor “Van”.'); return; }
+  const cf = conflictsFor(F);
+  if (cf.length && !F.warned) {
+    F.warned = true;
+    $('#conflict').innerHTML = '<div class="warn"><b>Let op, dit overlapt:</b><br>' + cf.map(b => esc(b.title) + ' (' + esc(fmtRange(b.start, b.end)) + ', ' + esc(nameOf(b.by)) + ')').join('<br>') + '<br>Tik nogmaals op Opslaan om toch door te gaan.</div>';
+    $('#savebtn').textContent = 'Toch opslaan'; return;
+  }
+  F.saving = true; const btn = $('#savebtn'); btn.disabled = true;
+  try {
+    const old = F.id ? S.bookings.find(x => x.id === F.id) : null;
+    const ref = F.id ? S.db.doc('bookings/' + F.id) : S.db.collection('bookings').doc();
+    await ref.set({ title, kind: F.kind, start: F.start, end: F.end, notes: F.notes.trim(), by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() });
+    S.cal.sel = F.start; const d = new Date(F.start + 'T00:00:00'); S.cal.y = d.getFullYear(); S.cal.m = d.getMonth();
+    closeSheet(); toast('Agenda bijgewerkt ✓'); renderView();
+  } catch (e) { F.saving = false; btn.disabled = false; dbFail(e); }
+}
+
+/* account en instellingen */
+function openSettings() {
+  const a = S.role === 'admin';
+  S.F = { name: S.settings.name || 'Camper Danny', baseKm: S.settings.baseKm ? String(S.settings.baseKm) : '' };
+  openSheet('<h2>' + (a ? 'Instellingen' : 'Account') + '</h2>' +
+    '<div class="roles"><b>' + esc(S.me.name) + '</b><br>' + esc(S.me.email || '') + '<br>Toegang: ' + esc(ROLES[S.role] || S.role || '') + '</div>' +
+    (a ? '<label style="margin-top:12px"><span class="lbl">Naam van de camper</span><input id="set-name" data-f="name" placeholder="Camper Danny" value="' + esc(S.F.name) + '"></label>' +
+      '<label><span class="lbl">Kilometers vóór dit logboek</span><input id="set-km" type="number" inputmode="decimal" min="0" data-f="baseKm" placeholder="0" value="' + esc(S.F.baseKm) + '"></label>' +
+      '<div class="field"><span class="lbl">Leden</span><div id="members" class="hint">Laden…</div></div>' : '') +
+    '<div class="actions"><button class="ghost" data-auth="logout">Uitloggen</button>' + (a ? '<button class="primary" data-act="savesettings">Opslaan</button>' : '<button class="primary" data-act="close">Sluit</button>') + '</div>', 'settings');
+  if (a) renderMembers();
+}
+async function renderMembers() {
+  await loadMembers();
+  const el = $('#members'); if (!el || S.sheetKind !== 'settings') return;
+  const list = (S.members || []).slice().sort((x, y) => (y.role === 'pending') - (x.role === 'pending') || String(x.name).localeCompare(String(y.name)));
+  el.className = '';
+  el.innerHTML = list.map(m => '<div class="member"><div class="nm">' + esc(m.name || 'Naamloos') + (m.user_id === S.me.id ? ' <small>(jij)</small>' : '') + '</div>' +
+    '<select data-role="' + esc(m.user_id) + '" aria-label="Toegang van ' + esc(m.name) + '"' + (m.user_id === S.me.id ? ' disabled' : '') + '>' +
+    Object.keys(ROLES).map(r => '<option value="' + r + '"' + (m.role === r ? ' selected' : '') + '>' + ROLES[r] + '</option>').join('') + '</select></div>').join('') +
+    '<div class="hint">Nieuwe leden zien niets tot jij ze toegang geeft.</div>';
+  renderHeader();
+}
+async function changeRole(uid, role) {
+  const { error } = await S.sb.from('members').update({ role }).eq('user_id', uid);
+  if (error) toast('Aanpassen is niet gelukt.'); else toast('Toegang aangepast ✓');
+  renderMembers();
+}
+async function saveSettings() {
+  try { await S.db.doc('settings/main').set({ name: S.F.name.trim(), baseKm: Math.max(0, parseFloat(String(S.F.baseKm).replace(',', '.')) || 0) }); closeSheet(); toast('Opgeslagen ✓'); }
+  catch (e) { dbFail(e); }
+}
+
+/* ---------- huuraanvragen: openbaar formulier ---------- */
+const MAXDAYS = 60;
+const REQ_ERR = {
+  name: 'Vul je naam in.',
+  email: 'Dit e-mailadres lijkt niet te kloppen.',
+  phone: 'Dat telefoonnummer is te lang.',
+  note: 'Je opmerking is te lang (maximaal 1000 tekens).',
+  dates: 'Kies een geldige periode (vanaf vandaag, maximaal ' + MAXDAYS + ' dagen).',
+  busy: 'Die periode is intussen niet meer vrij. Kies andere dagen.',
+  too_many: 'Je hebt al meerdere aanvragen gestuurd. Probeer het later opnieuw.'
+};
+const R = {};
+function resetR() {
+  const d = new Date();
+  Object.keys(R).forEach(k => delete R[k]);
+  Object.assign(R, { name: '', email: '', phone: '', note: '', hp: '', start: '', end: '', y: d.getFullYear(), m: d.getMonth(), busy: [], busyState: 'loading', hint: '', sending: false });
+}
+resetR();
+const fmtLong = s => new Date(s + 'T00:00:00').toLocaleDateString('nl-BE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const isBusy = ds => R.busy.some(b => b.d_start <= ds && ds <= b.d_end);
+function rangeHasBusy(a, b) {
+  for (let d = new Date(a + 'T00:00:00'), e = new Date(b + 'T00:00:00'); d <= e; d.setDate(d.getDate() + 1)) if (isBusy(ymd(d))) return true;
+  return false;
+}
+const daysText = n => (n + 1) + (n === 0 ? ' dag' : ' dagen') + (n ? ' (' + n + (n === 1 ? ' nacht' : ' nachten') + ')' : '');
+
+function showRequest() {
+  try { history.replaceState(history.state, '', '#huur'); } catch (e) {}
+  resetR();
+  authShell('<button class="back" type="button" data-req="back">‹ Terug</button>' +
+    '<h1>Huuraanvraag</h1><p>Vul je gegevens in en kies de periode waarin je de camper wilt huren. Daarna nemen we contact met je op.</p>' +
+    '<form id="reqform" novalidate>' +
+    '<label><span class="lbl">Naam</span><input id="r-name" autocomplete="name" maxlength="100"></label>' +
+    '<label><span class="lbl">E-mailadres</span><input id="r-email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" maxlength="200"></label>' +
+    '<label><span class="lbl">Telefoonnummer (optioneel)</span><input id="r-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="40"></label>' +
+    '<div class="field" style="margin-top:14px"><span class="lbl">Periode</span><div id="rcal"></div><div class="hint" id="rsum"></div></div>' +
+    '<label><span class="lbl">Opmerking (optioneel)</span><textarea id="r-note" maxlength="1000" placeholder="Met hoeveel personen ga je, waarheen, vragen…"></textarea></label>' +
+    '<div class="hp" aria-hidden="true"><label>Laat dit veld leeg<input id="r-hp" name="website" tabindex="-1" autocomplete="off"></label></div>' +
+    '<div class="hint" id="r-msg"></div>' +
+    '<button class="primary big" id="r-go" type="submit" style="margin-top:12px">Aanvraag verzenden</button>' +
+    '<p class="fine">Je gegevens gebruiken we alleen om je aanvraag te beantwoorden.</p></form>', true);
+  const w = $('#auth .authwrap'); if (w) w.scrollTop = 0;
+  drawRcal(); drawRsum(); loadBusy();
+}
+async function loadBusy() {
+  try {
+    const { data, error } = await S.sb.rpc('busy_dates');
+    if (error) throw error;
+    R.busy = (data || []).map(b => ({ d_start: String(b.d_start).slice(0, 10), d_end: String(b.d_end).slice(0, 10) }));
+    R.busyState = 'ok';
+  } catch (e) { R.busyState = 'fail'; }
+  drawRcal();
+}
+function drawRcal() {
+  const el = $('#rcal'); if (!el) return;
+  const t = new Date(), cur = t.getFullYear() * 12 + t.getMonth(), shown = R.y * 12 + R.m, today = todayStr();
+  const first = new Date(R.y, R.m, 1), off = (first.getDay() + 6) % 7, dim = new Date(R.y, R.m + 1, 0).getDate();
+  const title = first.toLocaleString('nl-BE', { month: 'long', year: 'numeric' });
+  let cells = '';
+  for (let i = 0; i < off; i++) cells += '<span class="rd blank"></span>';
+  for (let d = 1; d <= dim; d++) {
+    const ds = ymd(new Date(R.y, R.m, d)), past = ds < today, busy = !past && isBusy(ds);
+    const edge = ds === R.start || ds === R.end, mid = R.start && R.end && ds > R.start && ds < R.end;
+    const cls = 'rd' + (past ? ' off' : '') + (busy ? ' busy' : '') + (ds === today ? ' today' : '') + (edge ? ' sel' : '') + (mid ? ' mid' : '');
+    cells += '<button type="button" class="' + cls + '" data-req="day" data-d="' + ds + '"' + (past || busy ? ' disabled' : '') + ' aria-label="' + esc(fmtLong(ds)) + (busy ? ', bezet' : '') + '"' + (edge ? ' aria-pressed="true"' : '') + '>' + d + '</button>';
+  }
+  el.innerHTML = '<div class="calhead"><button type="button" class="iconbtn" data-req="mprev" aria-label="Vorige maand"' + (shown <= cur ? ' disabled style="opacity:.35"' : '') + '>‹</button><h2>' + esc(title) + '</h2><button type="button" class="iconbtn" data-req="mnext" aria-label="Volgende maand"' + (shown >= cur + 18 ? ' disabled style="opacity:.35"' : '') + '>›</button></div>' +
+    '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(d => '<span>' + d + '</span>').join('') + '</div><div class="grid rgrid">' + cells + '</div>' +
+    '<div class="legend"><span><i style="background:var(--accent)"></i>Jouw keuze</span><span><i class="hatch"></i>Bezet</span></div>' +
+    (R.busyState === 'fail' ? '<div class="hint err">De bezette dagen konden niet geladen worden. Je kunt toch een aanvraag doen. We controleren de beschikbaarheid daarna zelf.</div>' : '');
+}
+function drawRsum() {
+  const el = $('#rsum'); if (!el) return;
+  let t, cls = 'hint';
+  if (R.hint) { t = R.hint; cls += ' err'; }
+  else if (R.start && R.end) { t = 'Van ' + fmtLong(R.start) + ' tot en met ' + fmtLong(R.end) + ' · ' + daysText(diffDays(R.start, R.end)); cls += ' ok'; }
+  else if (R.start) t = 'Eerste dag: ' + fmtLong(R.start) + '. Tik nu op je laatste dag, of opnieuw op dezelfde dag voor één dag.';
+  else t = 'Tik op je eerste dag en daarna op je laatste dag.';
+  el.className = cls; el.textContent = t;
+}
+function pickDay(ds) {
+  if (ds < todayStr() || isBusy(ds)) return;
+  R.hint = '';
+  if (!R.start || R.end) { R.start = ds; R.end = ''; }
+  else if (ds < R.start) { R.start = ds; }
+  else if (rangeHasBusy(R.start, ds)) { R.start = ds; R.end = ''; R.hint = 'Tussen die dagen zit een bezette dag. Kies een periode zonder bezette dagen.'; }
+  else if (diffDays(R.start, ds) > MAXDAYS) { R.start = ds; R.end = ''; R.hint = 'Je kunt maximaal ' + MAXDAYS + ' dagen per aanvraag kiezen.'; }
+  else R.end = ds;
+  drawRcal(); drawRsum();
+}
+async function sendConfirmation(r) {
+  const c = window.APP_CONFIG || {};
+  if (!c.EMAILJS_SERVICE_ID || !c.EMAILJS_TEMPLATE_ID || !c.EMAILJS_PUBLIC_KEY) return 'off';
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
+  try {
+    const n = diffDays(r.start, r.end);
+    const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+      body: JSON.stringify({
+        service_id: c.EMAILJS_SERVICE_ID, template_id: c.EMAILJS_TEMPLATE_ID, user_id: c.EMAILJS_PUBLIC_KEY,
+        template_params: { to_name: r.name, to_email: r.email, start: fmtLong(r.start), end: fmtLong(r.end), days: daysText(n), camper: 'Camper Danny' }
+      })
+    });
+    return res.ok ? 'sent' : 'failed';
+  } catch (e) { return 'failed'; } finally { clearTimeout(timer); }
+}
+async function submitRequest() {
+  if (R.sending) return;
+  const msg = (t, err) => { const m = $('#r-msg'); if (m) { m.textContent = t || ''; m.className = 'hint' + (err ? ' err' : ''); } };
+  const name = R.name.trim(), email = R.email.trim(), phone = R.phone.trim(), note = R.note.trim();
+  if (name.length < 2) { msg('Vul je naam in.', true); $('#r-name').focus(); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg('Vul een geldig e-mailadres in.', true); $('#r-email').focus(); return; }
+  if (!R.start || !R.end) { msg('Kies eerst de periode in de kalender.', true); return; }
+  R.sending = true; const btn = $('#r-go'); btn.disabled = true; msg('Even geduld…');
+  try {
+    const { data, error } = await S.sb.rpc('submit_request', { p_name: name, p_email: email, p_phone: phone, p_start: R.start, p_end: R.end, p_note: note, p_hp: R.hp });
+    if (error) throw error;
+    if (!data || !data.ok) {
+      const k = data && data.error;
+      msg(REQ_ERR[k] || 'Controleer je gegevens en probeer opnieuw.', true);
+      if (k === 'busy') { R.start = ''; R.end = ''; R.hint = ''; drawRsum(); await loadBusy(); }
+      R.sending = false; btn.disabled = false; return;
+    }
+    const r = { name, email, phone, start: R.start, end: R.end };
+    const mail = R.hp ? 'off' : await sendConfirmation(r);
+    showRequestDone(r, mail);
+  } catch (e) {
+    R.sending = false; btn.disabled = false;
+    msg('Versturen is niet gelukt. Controleer je verbinding en probeer opnieuw.', true);
+  }
+}
+function showRequestDone(r, mail) {
+  const n = diffDays(r.start, r.end);
+  authShell('<h1>Bedankt, ' + esc(r.name.split(/\s+/)[0]) + '!</h1><p>We hebben je aanvraag ontvangen.</p>' +
+    '<div class="roles" style="margin:12px 0"><b>' + esc(fmtLong(r.start)) + (n ? ' tot en met ' + esc(fmtLong(r.end)) : '') + '</b><br>' + esc(daysText(n)) + '<br>' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</div>' +
+    (mail === 'sent' ? '<p>We stuurden een bevestiging naar <b>' + esc(r.email) + '</b>. Zie je niets, kijk dan ook in je spam.</p>' : '') +
+    (mail === 'failed' ? '<p>De bevestigingsmail kon niet verstuurd worden, maar je aanvraag is wel aangekomen.</p>' : '') +
+    '<p>We nemen zo snel mogelijk contact met je op. Je aanvraag is pas definitief nadat we die hebben goedgekeurd.</p>' +
+    '<button class="primary big" type="button" data-req="done" style="margin-top:12px">Klaar</button>', true);
+  const w = $('#auth .authwrap'); if (w) w.scrollTop = 0;
+}
+async function reEnter() {
+  try { const { data } = await S.sb.auth.getSession(); if (data.session) afterLogin(data.session.user); else showAuth('in'); } catch (e) { showAuth('in'); }
+}
+function closeRequest() {
+  try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+  if (S.db) { $('#auth').innerHTML = ''; return; }
+  reEnter();
+}
+
+/* ---------- huuraanvragen: beheren in de app ---------- */
+const publicLink = () => location.href.split('#')[0].replace(/index\.html$/, '') + '#huur';
+function copyLink() {
+  const l = publicLink();
+  try { navigator.clipboard.writeText(l).then(() => toast('Link gekopieerd ✓'), () => toast(l)); } catch (e) { toast(l); }
+}
+async function loadRequests() {
+  if (!S.sb || !S.canWrite) return;
+  try {
+    const { data, error } = await S.sb.from('requests').select('*').order('created_at', { ascending: false });
+    if (error || !data) return;
+    const sig = JSON.stringify(data.map(r => [r.id, r.status]));
+    const prev = S.reqLoaded ? new Set(S.requests.map(r => r.id)) : null;
+    if (S.reqLoaded && sig === S.reqSig) return;
+    S.reqSig = sig; S.requests = data; S.reqLoaded = true;
+    S.newReqCount = data.filter(r => r.status === 'new').length;
+    if (prev) data.filter(r => r.status === 'new' && !prev.has(r.id)).forEach(r => toast('Nieuwe huuraanvraag van ' + r.name));
+    refresh();
+  } catch (e) {}
+}
+let rqLive = false;
+function startRequestLive() {
+  if (rqLive) return; rqLive = true;
+  try { S.sb.channel('requests-live').on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => loadRequests()).subscribe(); } catch (e) {}
+  setInterval(() => { if (!document.hidden) loadRequests(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadRequests(); });
+}
+function reqSeg() {
+  return '<div class="seg"><button class="' + (S.reqTab !== 'req' ? 'on' : '') + '" data-act="reqtab" data-k="cal">Kalender</button><button class="' + (S.reqTab === 'req' ? 'on' : '') + '" data-act="reqtab" data-k="req">Aanvragen' + (S.newReqCount ? ' <b class="cnt">' + S.newReqCount + '</b>' : '') + '</button></div>';
+}
+const rqConflicts = r => S.bookings.filter(b => b.start <= r.end_date && r.start_date <= (b.end || b.start));
+function rqHTML(r) {
+  const n = diffDays(r.start_date, r.end_date), isNew = r.status === 'new', cf = isNew ? rqConflicts(r) : [];
+  const tag = isNew ? '<span class="tag" style="--c:var(--orange)">Nieuw</span>' : r.status === 'approved' ? '<span class="tag" style="--c:var(--green)">Goedgekeurd</span>' : '<span class="tag" style="--c:var(--muted)">Afgewezen</span>';
+  const tel = String(r.phone || '').replace(/[^0-9+]/g, ''), id = esc(r.id);
+  return '<div class="rq"><div class="rqh"><h4>' + esc(r.name) + '</h4>' + tag + '</div>' +
+    '<div class="m">' + esc(fmtRange(r.start_date, r.end_date)) + ' · ' + esc(daysText(n)) + '</div>' +
+    '<div class="rqc"><a href="mailto:' + esc(r.email) + '">' + esc(r.email) + '</a>' + (r.phone ? ' · <a href="tel:' + esc(tel) + '">' + esc(r.phone) + '</a>' : '') + '</div>' +
+    (r.note ? '<div class="n">' + esc(r.note) + '</div>' : '') +
+    (cf.length ? '<div class="warn">Overlapt met: ' + cf.map(b => esc(b.title) + ' (' + esc(fmtRange(b.start, b.end)) + ')').join(', ') + '</div>' : '') +
+    '<div class="m">Ingediend op ' + esc(fmtDate(r.created_at, true)) + '</div>' +
+    (isNew ? '<div class="actions"><button class="danger" data-act="rqreject" data-id="' + id + '">Afwijzen</button><button class="primary" data-act="rqapprove" data-id="' + id + '">Goedkeuren</button></div>'
+      : '<div class="actions"><button class="ghost" data-act="rqdel" data-id="' + id + '">Verwijder gegevens</button></div>') + '</div>';
+}
+function requestsView() {
+  const nw = S.requests.filter(r => r.status === 'new'), done = S.requests.filter(r => r.status !== 'new');
+  return '<div class="scroll">' + reqSeg() +
+    '<div class="sec" style="margin-top:4px">Nieuw' + (nw.length ? ' (' + nw.length + ')' : '') + '</div>' +
+    (nw.length ? nw.map(rqHTML).join('') : '<div class="hint" style="margin:0 0 6px 2px">Geen nieuwe aanvragen.</div>') +
+    (done.length ? '<div class="sec">Behandeld</div>' + done.map(rqHTML).join('') : '') +
+    '<div class="roles" style="margin-top:14px"><b>Link voor klanten</b><br><span style="overflow-wrap:anywhere">' + esc(publicLink()) + '</span><br><button class="small" style="margin-top:8px" data-act="copylink">Link kopiëren</button></div></div>';
+}
+function openDecision(id, approve) {
+  const r = S.requests.find(x => x.id === id); if (!r) return;
+  const cf = approve ? rqConflicts(r) : [];
+  openSheet('<h2>' + (approve ? 'Aanvraag goedkeuren?' : 'Aanvraag afwijzen?') + '</h2>' +
+    '<p style="margin:0 0 8px"><b>' + esc(r.name) + '</b><br>' + esc(fmtRange(r.start_date, r.end_date)) + '</p>' +
+    (approve ? '<p style="margin:0 0 8px">De periode komt als <b>Gereserveerd</b> in de agenda.</p>' : '') +
+    '<p style="margin:0 0 4px">De aanvrager krijgt hierover geen automatische mail. Neem zelf contact op via <b>' + esc(r.email) + '</b>' + (r.phone ? ' of ' + esc(r.phone) : '') + '.</p>' +
+    (cf.length ? '<div class="warn"><b>Let op, dit overlapt:</b><br>' + cf.map(b => esc(b.title) + ' (' + esc(fmtRange(b.start, b.end)) + ')').join('<br>') + '</div>' : '') +
+    '<div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="' + (approve ? 'primary' : 'danger') + '" data-act="rqdo" data-id="' + esc(id) + '" data-ok="' + (approve ? '1' : '0') + '">' + (approve ? (cf.length ? 'Toch goedkeuren' : 'Goedkeuren') : 'Afwijzen') + '</button></div>', 'rqconfirm');
+}
+let rqBusy = false;
+async function decide(id, ok) {
+  if (rqBusy) return; rqBusy = true;
+  try {
+    const { data, error } = await S.sb.rpc('decide_request', { p_id: id, p_approve: ok });
+    if (error) throw error;
+    const k = data && data.error;
+    if (!data || !data.ok) toast(k === 'already' ? 'Deze aanvraag is al behandeld.' : k === 'forbidden' ? 'Je hebt hier geen rechten voor.' : 'Dat lukte niet. Probeer opnieuw.');
+    else toast(ok ? 'Goedgekeurd en in de agenda gezet ✓' : 'Aanvraag afgewezen');
+    closeSheet(); await loadRequests(); if (S.db && S.db.reload) S.db.reload();
+  } catch (e) { toast('Dat lukte niet. Controleer je verbinding.'); }
+  finally { rqBusy = false; }
+}
+async function deleteRequest(id) {
+  try {
+    const { error } = await S.sb.from('requests').delete().eq('id', id);
+    if (error) throw error;
+    closeSheet(); toast('Gegevens verwijderd'); S.reqSig = ''; await loadRequests();
+  } catch (e) { toast('Verwijderen is niet gelukt.'); }
+}
+
+document.addEventListener('input', e => { const t = e.target; if (t.id && /^r-(name|email|phone|note|hp)$/.test(t.id)) R[t.id.slice(2)] = t.value; });
+document.addEventListener('submit', e => { if (e.target.id === 'reqform') { e.preventDefault(); submitRequest(); } });
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-req]'); if (!a) return;
+  switch (a.dataset.req) {
+    case 'open': showRequest(); break;
+    case 'back': case 'done': closeRequest(); break;
+    case 'day': pickDay(a.dataset.d); break;
+    case 'mprev': R.m--; if (R.m < 0) { R.m = 11; R.y--; } drawRcal(); break;
+    case 'mnext': R.m++; if (R.m > 11) { R.m = 0; R.y++; } drawRcal(); break;
+  }
+});
+
+/* ---------- events ---------- */
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.f && S.F) S.F[t.dataset.f] = t.value;
+  if (t.id === 'stopname') {
+    const m = matches(t.value), el = $('#sugs');
+    if (el) el.innerHTML = m.map((p, i) => '<button data-act="sug" data-i="' + PLACES.indexOf(p) + '">' + esc(p.name) + '</button>').join('');
+  }
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'photoin' || !S.F) return;
+  const files = [...e.target.files]; e.target.value = '';
+  const msg = $('#photomsg');
+  for (let i = 0; i < files.length; i++) {
+    if (msg) msg.textContent = 'Foto ' + (i + 1) + '/' + files.length + ' verkleinen…';
+    try { S.F.newPhotos.push(await prep(files[i])); } catch (x) { toast('Eén foto kon niet gelezen worden.'); }
+  }
+  if (msg) msg.textContent = ''; renderPhotos();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'stopname') { e.preventDefault(); addStopFromInput(); } const lb = $('.lightbox'); if (lb && lb._go && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { lb._go(e.key === 'ArrowLeft' ? -1 : 1); return; }
+  if (e.key === 'Escape') { if ($('.picker')) { $('.picker').remove(); return; } if ($('.lightbox')) $('.lightbox').remove(); else if (S.sheetKind) closeSheet(); } });
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act, id = a.dataset.id;
+  if (act === 'scrim') { if (e.target === a) closeSheet(); return; }
+  if (act === 'lightbox') {
+    const l = S.photoCache[id]; if (!l) return; const i = l.items.findIndex(x => x.id === a.dataset.p); if (i < 0) return;
+    openGallery(l.items, i); return;
+  }
+  switch (act) {
+    case 'tab': goTab(a.dataset.t); break;
+    case 'close': closeSheet(); break;
+    case 'zin': { const r = $('#mapwrap').getBoundingClientRect(); zoomAt(0.6, r.left + r.width / 2, r.top + r.height / 2); break; }
+    case 'zout': { const r = $('#mapwrap').getBoundingClientRect(); zoomAt(1.65, r.left + r.width / 2, r.top + r.height / 2); break; }
+    case 'zfit': fitMap(); S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); break;
+    case 'detail': openDetail(id); break;
+    case 'newtrip': openTripForm(null); break;
+    case 'edittrip': openTripForm(id); break;
+    case 'deltrip': confirmSheet('Deze reis en al zijn foto’s worden definitief verwijderd.', 'Ja, verwijder', 'deltrip2', id); break;
+    case 'deltrip2': deleteTrip(id); break;
+    case 'savetrip': saveTrip(); break;
+    case 'addstop': addStopFromInput(); break;
+    case 'gps': gps(); break;
+    case 'sug': { const p = PLACES[+a.dataset.i]; if (p) addStop(p.name, p.lat, p.lon); break; }
+    case 'addcoord': { const la = parseFloat(($('#clat').value || '').replace(',', '.')), lo = parseFloat(($('#clon').value || '').replace(',', '.')), inp = $('#stopname'); addStop(inp && inp.value.trim() || '', la, lo); $('#clat').value = ''; $('#clon').value = ''; break; }
+    case 'stopdel': S.F.stops.splice(+a.dataset.i, 1); renderStops(); break;
+    case 'stopup': { const i = +a.dataset.i; if (i > 0) { const s = S.F.stops; [s[i - 1], s[i]] = [s[i], s[i - 1]]; renderStops(); } break; }
+    case 'phdel': S.F.newPhotos.splice(+a.dataset.i, 1); renderPhotos(); break;
+    case 'phtoggle': S.F.remove[id] = !S.F.remove[id]; renderPhotos(); break;
+    case 'cprev': { S.cal.m--; if (S.cal.m < 0) { S.cal.m = 11; S.cal.y--; } renderView(); break; }
+    case 'cnext': { S.cal.m++; if (S.cal.m > 11) { S.cal.m = 0; S.cal.y++; } renderView(); break; }
+    case 'selday': S.cal.sel = a.dataset.d; { const d = new Date(a.dataset.d + 'T00:00:00'); S.cal.y = d.getFullYear(); S.cal.m = d.getMonth(); } renderView(); break;
+    case 'newbooking': openBookingForm(null); break;
+    case 'editbooking': openBookingForm(id); break;
+    case 'kind': S.F.kind = a.dataset.k; S.F.warned = false; { const sc = $('#sheet .sheet').scrollTop; $('#sheet .sheet').innerHTML = bookingHTML(); $('#sheet .sheet').scrollTop = sc; } break;
+    case 'savebooking': saveBooking(); break;
+    case 'delbooking': confirmSheet('Deze boeking wordt verwijderd uit de agenda.', 'Ja, verwijder', 'delbooking2', id); break;
+    case 'delbooking2': S.db.doc('bookings/' + id).delete().then(() => { closeSheet(); toast('Boeking verwijderd'); }).catch(dbFail); break;
+    case 'newspot': openSpotForm(null); break;
+    case 'editspot': openSpotForm(id); break;
+    case 'spot': openSpot(id); break;
+    case 'savespot': saveSpot(); break;
+    case 'spotmap': openPicker(); break;
+    case 'spotfav': S.F.fav = !S.F.fav; a.className = 'favbtn' + (S.F.fav ? ' on' : ''); a.textContent = S.F.fav ? '♥ Zeker nog eens naartoe' : '♡ Zeker nog eens naartoe?'; break;
+    case 'sfilter': S.spotFav = a.dataset.k === 'fav'; renderView(); break;
+    case 'delspot': confirmSheet('Deze spot en al zijn foto’s worden definitief verwijderd.', 'Ja, verwijder', 'delspot2', id); break;
+    case 'delspot2': deleteSpot(id); break;
+    case 'newtodo': openTodoForm(null); break;
+    case 'edittodo': openTodoForm(id); break;
+    case 'ttoggle': toggleTodo(id); break;
+    case 'tkind': case 'tprio': { S.F[act === 'tkind' ? 'kind' : 'prio'] = a.dataset.k; const sh = $('#sheet .sheet'), sc = sh.scrollTop; sh.innerHTML = todoFormHTML(); sh.scrollTop = sc; break; }
+    case 'tcat': S.todoCat = a.dataset.k; renderView(); break;
+    case 'tshow': S.todoShow = a.dataset.k; renderView(); break;
+    case 'savetodo': saveTodo(); break;
+    case 'deltodo': confirmSheet('Dit punt wordt verwijderd uit de lijst.', 'Ja, verwijder', 'deltodo2', id); break;
+    case 'deltodo2': S.db.doc('todos/' + id).delete().then(() => { closeSheet(); toast('Punt verwijderd'); }).catch(dbFail); break;
+    case 'openreq': S.reqTab = 'req'; goTab('agenda'); break;
+    case 'reqtab': S.reqTab = a.dataset.k; renderView(); break;
+    case 'rqapprove': openDecision(id, true); break;
+    case 'rqreject': openDecision(id, false); break;
+    case 'rqdo': decide(id, a.dataset.ok === '1'); break;
+    case 'rqdel': confirmSheet('Alle gegevens van deze aanvrager worden definitief verwijderd.', 'Ja, verwijder', 'rqdel2', id); break;
+    case 'rqdel2': deleteRequest(id); break;
+    case 'copylink': copyLink(); break;
+    case 'settings': openSettings(); break;
+    case 'savesettings': saveSettings(); break;
+  }
+});
+window.addEventListener('resize', () => { if (S.tab === 'map' && $('#mapwrap')) drawMap(); });
+
+/* ---------- terug-knop en veegbeweging: naar het vorige scherm ---------- */
+S.tabHist = [];
+function goTab(t, fromBack) {
+  if (!fromBack && S.tab !== t) { S.tabHist.push(S.tab); if (S.tabHist.length > 30) S.tabHist.shift(); }
+  S.tab = t; if (t === 'map') M.fitted = false; renderView(); renderNav();
+}
+function handleBack() {
+  const lb = $('.lightbox'); if (lb) { lb.remove(); return true; }
+  const pk = $('.picker'); if (pk) { pk.remove(); return true; }
+  if (S.sheetKind) { closeSheet(); return true; }
+  if ($('#reqform')) { closeRequest(); return true; }
+  if (S.db && S.tabHist.length) { goTab(S.tabHist.pop(), true); return true; }
+  if (S.db && S.tab !== 'home') { goTab('home', true); return true; }
+  return false;
+}
+// De browser houdt steeds één stap "voor" op de app. Drukt iemand op terug, dan sluiten we eerst het bovenste scherm
+// en zetten die stap weer vooraan. Pas op het beginscherm laten we de browser echt terug gaan.
+try {
+  const st = history.state && history.state.cd;
+  if (st !== 1) { if (st !== 0) history.replaceState({ cd: 0 }, '', location.href); history.pushState({ cd: 1 }, '', location.href); }
+  window.addEventListener('popstate', () => {
+    if (history.state && history.state.cd === 1) return;
+    if (handleBack()) { try { history.pushState({ cd: 1 }, '', location.href); } catch (e) {} } else { try { history.back(); } catch (e) {} }
+  });
+} catch (e) {}
+
+try { if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
+boot();
+})();
+</script>
+</body>
+</html>
