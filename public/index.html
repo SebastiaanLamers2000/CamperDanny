@@ -384,7 +384,9 @@ const S = {
   cal: { y: now.getFullYear(), m: now.getMonth(), sel: todayStr() }, error: '', photoCache: {}
 };
 const writable = () => !!S.db && S.canWrite !== false;
-const canEditItem = it => writable() && (S.canAdmin || !it.by || (S.me && it.by === S.me.id));
+const isGuest = () => S.role === 'guest';
+const canEditItem = it => writable() && (S.canAdmin || (isGuest() ? !!(S.me && it.by === S.me.id) : (!it.by || (S.me && it.by === S.me.id))));
+const canDeleteItem = it => !isGuest() && canEditItem(it);
 const nameOf = id => (S.names[id]) || (S.me && id === S.me.id ? 'jij' : 'iemand');
 const sortedTrips = () => S.trips.slice().sort((a, b) => (b.start || '').localeCompare(a.start || ''));
 const tripColor = t => { const asc = S.trips.slice().sort((a, b) => (a.start || '').localeCompare(b.start || '')); return PALETTE[Math.max(0, asc.findIndex(x => x.id === t.id)) % PALETTE.length]; };
@@ -531,7 +533,7 @@ function makeDb(sb) {
   return { doc: docRef, collection: collRef, reload: reloadAll };
 }
 
-const ROLES = { pending: 'Wacht op goedkeuring', viewer: 'Alleen kaart en tijdlijn', member: 'Alles (toevoegen en bewerken)', admin: 'Beheerder' };
+const ROLES = { pending: 'Wacht op goedkeuring', viewer: 'Alleen kaart en tijdlijn', guest: 'Gast (alles zien en toevoegen, geen to-do)', member: 'Alles (toevoegen en bewerken)', admin: 'Beheerder' };
 
 function authShell(inner, wide) { $('#auth').innerHTML = '<div class="authwrap"><div class="authcard' + (wide ? ' wide' : '') + '">' + inner + '</div></div>'; }
 function showMessage(title, text, extra) {
@@ -616,10 +618,10 @@ async function afterLogin(user) {
   }
   $('#auth').innerHTML = '';
   S.db = makeDb(S.sb);
-  S.canWrite = S.role === 'member' || S.role === 'admin';
+  S.canWrite = S.role === 'guest' || S.role === 'member' || S.role === 'admin';
   S.canAdmin = S.role === 'admin';
   S.names = {}; await loadMembers();
-  if (!S.canWrite && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) S.tab = 'home';
+  if ((!S.canWrite && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) || (isGuest() && S.tab === 'todo')) S.tab = 'home';
   render();
   const db = S.db;
   const onErr = e => {
@@ -636,7 +638,7 @@ async function afterLogin(user) {
       S.bookings = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
       resolveNames(); refresh();
     }, onErr);
-    db.collection('todos').onSnapshot(snap => {
+    if (!isGuest()) db.collection('todos').onSnapshot(snap => {
       S.todos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
       resolveNames(); refresh();
     }, onErr);
@@ -696,7 +698,7 @@ const ICONS = {
 const full = () => S.canWrite !== false;
 function renderNav() {
   const tabs = [['home', 'Start'], ['map', 'Kaart'], ['timeline', 'Tijdlijn']];
-  if (full()) tabs.push(['spots', 'Spots'], ['agenda', 'Agenda'], ['todo', 'To-do']);
+  if (full()) { tabs.push(['spots', 'Spots'], ['agenda', 'Agenda']); if (!isGuest()) tabs.push(['todo', 'To-do']); }
   $('#nav').innerHTML = tabs.map(t => '<button class="' + (S.tab === t[0] ? 'on' : '') + '" data-act="tab" data-t="' + t[0] + '">' + ICONS[t[0]] + t[1] + (t[0] === 'agenda' && S.newReqCount ? '<i class="navdot"></i>' : '') + '</button>').join('');
 }
 function renderFab() {
@@ -706,7 +708,7 @@ function renderFab() {
 }
 function render() { renderHeader(); renderView(); renderNav(); }
 function renderView() {
-  if (!full() && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) S.tab = 'home';
+  if ((!full() && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) || (isGuest() && S.tab === 'todo')) S.tab = 'home';
   renderFab();
   const v = $('#view');
   if (S.tab === 'home') v.innerHTML = homeView();
@@ -943,7 +945,7 @@ function homeView() {
   const nb = full() ? nextBooking() : null, last = sortedTrips()[0];
   const places = new Set(allStops().map(s => norm(s.name))).size, n = S.trips.length;
   let h = '<div class="scroll">';
-  if (full() && S.newReqCount) h += '<button class="next reqcard" data-act="openreq"><span class="k">Huuraanvraag</span><h3>' + S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') + '</h3><div class="m">Tik om te bekijken, goed te keuren of af te wijzen</div></button>';
+  if (full() && S.newReqCount) h += '<button class="next reqcard" data-act="openreq"><span class="k">Huuraanvraag</span><h3>' + S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') + '</h3><div class="m">' + (isGuest() ? 'Tik om te bekijken' : 'Tik om te bekijken, goed te keuren of af te wijzen') + '</div></button>';
   if (nb) {
     const d = diffDays(todayStr(), nb.start), when = d <= 0 ? 'Nu bezig' : d === 1 ? 'Morgen' : 'Over ' + d + ' dagen';
     h += '<button class="next" data-act="tab" data-t="agenda"><span class="k">' + when + ' · ' + esc((KINDS[nb.kind] || KINDS.plan).label) + '</span><h3>' + esc(nb.title) + '</h3><div class="m">' + esc(fmtRange(nb.start, nb.end)) + (nb.by ? ' · ' + esc(nameOf(nb.by)) : '') + '</div></button>';
@@ -952,10 +954,10 @@ function homeView() {
   }
   const tile = (t, title, sub, cls) => '<button class="tile' + (cls ? ' ' + cls : '') + '" data-act="tab" data-t="' + t + '">' + ICONS[t] + '<div><b>' + title + '</b><span class="s">' + esc(sub) + '</span></div></button>';
   h += '<div class="tiles">' + tile('map', 'Kaart', places + (places === 1 ? ' plaats bezocht' : ' plaatsen bezocht')) + tile('timeline', 'Tijdlijn', n + (n === 1 ? ' reis' : ' reizen'));
-  if (full()) h += tile('agenda', 'Agenda', S.newReqCount ? S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') : (nb ? 'Volgende: ' + fmtDate(nb.start) : 'Nog niets gepland'), S.newReqCount ? 'alert' : '') + tile('todo', 'To-do', open.length ? open.length + ' open' + (kapot ? ' · ' + kapot + ' kapot' : '') : 'Alles in orde', kapot ? 'alert' : '');
+  if (full()) h += tile('agenda', 'Agenda', S.newReqCount ? S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') : (nb ? 'Volgende: ' + fmtDate(nb.start) : 'Nog niets gepland'), S.newReqCount ? 'alert' : (isGuest() ? 'wide' : '')) + (isGuest() ? '' : tile('todo', 'To-do', open.length ? open.length + ' open' + (kapot ? ' · ' + kapot + ' kapot' : '') : 'Alles in orde', kapot ? 'alert' : ''));
   if (full()) h += tile('spots', 'Leuke spots', S.spots.length ? S.spots.length + (S.spots.length === 1 ? ' plek bewaard' : ' plekken bewaard') + (S.spots.some(s => s.fav) ? ' · ' + S.spots.filter(s => s.fav).length + ' ♥' : '') : 'Bewaar mooie overnachtingsplekken', 'wide');
   h += '</div>';
-  if (writable()) h += '<div class="quick"><button class="primary" data-act="newtrip">+ Nieuwe reis toevoegen</button><div class="row2"><button class="ghost" data-act="newbooking">Camper reserveren</button><button class="ghost" data-act="newtodo">To-do toevoegen</button></div><button class="ghost" data-act="copylink">Link voor klanten kopiëren</button></div>';
+  if (writable()) h += '<div class="quick"><button class="primary" data-act="newtrip">+ Nieuwe reis toevoegen</button><div class="row2"><button class="ghost" data-act="newbooking">Camper reserveren</button>' + (isGuest() ? '' : '<button class="ghost" data-act="newtodo">To-do toevoegen</button>') + '</div><button class="ghost" data-act="copylink">Link voor klanten kopiëren</button></div>';
   else if (S.canWrite === false) h += '<div class="roles" style="margin-top:14px">Je hebt toegang tot de kaart en de tijdlijn.</div>';
   return h + '</div>';
 }
@@ -1105,7 +1107,7 @@ async function openDetail(id, soft) {
     '<div class="kv">' + (t.km ? '<span class="pill km">' + fmtNum(t.km) + ' km</span>' : '') + (t.stops || []).map((s, i) => '<span class="pill">' + (i + 1) + '. ' + esc(s.name) + '</span>').join('') + '</div>' +
     (t.notes ? '<div class="notes">' + esc(t.notes) + '</div>' : '') +
     (t.photoCount ? '<div class="lbl">Foto’s</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
-    '<div class="actions">' + (canEditItem(t) ? '<button class="danger" data-act="deltrip" data-id="' + id + '">Verwijder</button><button class="ghost" data-act="edittrip" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
+    '<div class="actions">' + (canDeleteItem(t) ? '<button class="danger" data-act="deltrip" data-id="' + id + '">Verwijder</button>' : '') + (canEditItem(t) ? '<button class="ghost" data-act="edittrip" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
   openSheet(html, 'detail', id);
   if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
   if (t.photoCount && S.db) showPhotos('trips', id, t.photoCount);
@@ -1141,7 +1143,7 @@ async function openSpot(id, soft) {
     (s.notes ? '<div class="notes">' + esc(s.notes) + '</div>' : '') +
     (s.photoCount ? '<div class="lbl">Foto’s</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
     '<a class="linkbtn" href="' + esc(spotOpen(s)) + '" target="_blank" rel="noopener">Open in Google Maps</a>' + (hasLoc(s) ? '<a class="linkbtn" href="' + esc(spotRoute(s)) + '" target="_blank" rel="noopener">Route plannen</a>' : '') +
-    '<div class="actions">' + (canEditItem(s) ? '<button class="danger" data-act="delspot" data-id="' + id + '">Verwijder</button><button class="ghost" data-act="editspot" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
+    '<div class="actions">' + (canDeleteItem(s) ? '<button class="danger" data-act="delspot" data-id="' + id + '">Verwijder</button>' : '') + (canEditItem(s) ? '<button class="ghost" data-act="editspot" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
   openSheet(html, 'spot', id);
   if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
   if (s.photoCount) showPhotos('spots', id, s.photoCount);
@@ -1266,7 +1268,7 @@ async function resolveMapLink(url) {
 }
 let repaired = false;
 async function repairSpots() {
-  if (repaired || !writable()) return; repaired = true;
+  if (repaired || !writable() || isGuest()) return; repaired = true;
   const todo = S.spots.filter(s => !hasLoc(s) && (s.link || urlIn(s.place) || urlIn(s.notes) || urlIn(s.title)));
   let fixed = 0;
   for (const s of todo) {
@@ -1540,7 +1542,7 @@ function bookingHTML() {
     '<div class="row2"><label><span class="lbl">Van</span><input type="date" data-f="start" value="' + esc(F.start) + '"></label><label><span class="lbl">Tot en met</span><input type="date" data-f="end" value="' + esc(F.end) + '"></label></div>' +
     '<label><span class="lbl">Notitie</span><textarea data-f="notes" placeholder="Wie gaat mee, wat is de bedoeling…">' + esc(F.notes) + '</textarea></label>' +
     '<div id="conflict"></div>' +
-    '<div class="actions">' + (F.id ? '<button class="danger" data-act="delbooking" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
+    '<div class="actions">' + (F.id && !isGuest() ? '<button class="danger" data-act="delbooking" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
 }
 function conflictsFor(F) {
   if (F.kind === 'plan') return [];
@@ -1791,7 +1793,7 @@ function rqHTML(r) {
     (r.note ? '<div class="n">' + esc(r.note) + '</div>' : '') +
     (cf.length ? '<div class="warn">Overlapt met: ' + cf.map(b => esc(b.title) + ' (' + esc(fmtRange(b.start, b.end)) + ')').join(', ') + '</div>' : '') +
     '<div class="m">Ingediend op ' + esc(fmtDate(r.created_at, true)) + '</div>' +
-    (isNew ? '<div class="actions"><button class="danger" data-act="rqreject" data-id="' + id + '">Afwijzen</button><button class="primary" data-act="rqapprove" data-id="' + id + '">Goedkeuren</button></div>'
+    (isGuest() ? '' : isNew ? '<div class="actions"><button class="danger" data-act="rqreject" data-id="' + id + '">Afwijzen</button><button class="primary" data-act="rqapprove" data-id="' + id + '">Goedkeuren</button></div>'
       : '<div class="actions"><button class="ghost" data-act="rqdel" data-id="' + id + '">Verwijder gegevens</button></div>') + '</div>';
 }
 function requestsView() {
