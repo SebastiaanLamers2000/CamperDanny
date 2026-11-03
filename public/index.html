@@ -273,6 +273,7 @@ details summary{color:var(--muted);cursor:pointer}
 .pkbar input{flex:1;min-width:0}.pkx{border:1px solid var(--line);background:var(--bg);border-radius:10px;width:42px;font-size:20px}
 .pksugs{position:absolute;left:10px;right:10px;top:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
 .pksugs:empty{display:none}.pksugs button{text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:11px 12px;font-size:14px}.pksugs .hint{padding:10px 12px}
+.pktip{padding:7px 12px;font-size:12.5px;color:var(--muted);background:var(--surface);border-bottom:1px solid var(--line);line-height:1.35}.pktip a{color:var(--accent);font-weight:600}
 .pkmap{flex:1;position:relative;overflow:hidden;touch-action:none;background:#e6e2d8;cursor:crosshair}
 .pkmap img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .pkpin{position:absolute;font-size:32px;line-height:1;transform:translate(-50%,-92%);pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
@@ -1270,17 +1271,18 @@ const mx = (lon, z) => (lon + 180) / 360 * Math.pow(2, z) * TILE;
 const my = (lat, z) => { const s = Math.sin(clamp(lat, -85, 85) * Math.PI / 180); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * Math.pow(2, z) * TILE; };
 const ilon = (x, z) => x / (Math.pow(2, z) * TILE) * 360 - 180;
 const ilat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / (Math.pow(2, z) * TILE); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
-function openPicker() {
-  const F = S.F; if (!F || $('.picker')) return;
+function openPicker(O) {
+  const F = S.F; if (!F || $('.picker')) return; O = O || {};
   pushStep();
   const el = document.createElement('div'); el.className = 'picker';
   el.innerHTML = '<div class="pkbar"><button class="pkx" data-pk="close" aria-label="Terug">←</button><input id="pksearch" placeholder="Zoek een plaats of adres…" autocomplete="off"><div class="pksugs" id="pksugs"></div></div>' +
+    '<div class="pktip">Liever Google Maps? <a href="https://www.google.com/maps" target="_blank" rel="noopener">Open Google Maps</a>, zoek daar de plek, kopieer de coördinaten of de link en plak ze hierboven.</div>' +
     '<div class="pkmap" id="pkmap"><div class="pkpin" id="pkpin" hidden>📍</div><div class="pkctl"><button data-pk="zin" aria-label="Inzoomen">+</button><button data-pk="zout" aria-label="Uitzoomen">−</button><button data-pk="gps" aria-label="Mijn locatie">⌖</button></div><div class="pkattr">© OpenStreetMap</div></div>' +
     '<div class="pkfoot"><span id="pkinfo">Tik op de kaart om de plek te kiezen</span><button class="primary" id="pkok" data-pk="ok" disabled>Gebruik deze locatie</button></div>';
   document.body.appendChild(el);
   const map = el.querySelector('#pkmap'), pinEl = el.querySelector('#pkpin'), ok = el.querySelector('#pkok'), info = el.querySelector('#pkinfo');
   const P = { lat: 50.6, lon: 4.6, z: 6, pin: null };
-  if (F.lat != null && F.lon != null) { P.lat = +F.lat; P.lon = +F.lon; P.z = 13; P.pin = { lat: +F.lat, lon: +F.lon }; }
+  if (O.lat != null && O.lon != null && isFinite(O.lat) && isFinite(O.lon)) { P.lat = +O.lat; P.lon = +O.lon; P.z = 13; if (O.pin !== false) P.pin = { lat: +O.lat, lon: +O.lon }; }
   else { const l = allStops().filter(s => isFinite(s.lat) && isFinite(s.lon)).pop(); if (l) { P.lat = l.lat; P.lon = l.lon; P.z = 7; } }
   el._P = P;
   const tiles = new Map(), size = () => { const r = map.getBoundingClientRect(); return [r.width || 360, r.height || 480]; };
@@ -1349,7 +1351,7 @@ function openPicker() {
     else if (k === 'gps') {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(p => { P.lat = p.coords.latitude; P.lon = p.coords.longitude; P.z = 15; setPin(P.lat, P.lon); }, () => { info.textContent = 'Geen toegang tot je locatie.'; }, { enableHighAccuracy: true, timeout: 12000 });
-    } else if (k === 'ok' && P.pin) { const pin = P.pin; el.remove(); if (S.F === F) nameFromCoords(pin.lat, pin.lon, P.label); }
+    } else if (k === 'ok' && P.pin) { const pin = P.pin; el.remove(); if (S.F === F && O.onPick) O.onPick(pin.lat, pin.lon, P.label); }
   });
 }
 
@@ -1416,10 +1418,7 @@ async function openTripForm(id) {
     '<div class="row2"><label><span class="lbl">Vertrek</span><input type="datetime-local" data-f="start" value="' + esc(S.F.start) + '"></label><label><span class="lbl">Terug</span><input type="datetime-local" data-f="end" value="' + esc(S.F.end) + '"></label></div>' +
     '<label><span class="lbl">Gereden kilometers</span><input type="number" inputmode="decimal" min="0" data-f="km" placeholder="bv. 412" value="' + esc(S.F.km) + '"></label>' +
     '<div class="field"><span class="lbl">Bestemmingen (in volgorde)</span><div id="stops"></div>' +
-    '<div class="addstop"><input id="stopname" placeholder="Zoek een plaats…" autocomplete="off"><button class="small" data-act="addstop">Toevoegen</button></div>' +
-    '<div class="sugs" id="sugs"></div>' +
-    '<div class="mini"><button data-act="gps">📍 Mijn locatie</button></div>' +
-    '<details><summary>Coördinaten zelf invoeren</summary><div class="row2" style="margin-top:8px"><input id="clat" inputmode="decimal" placeholder="Breedtegraad (bv. 50.85)"><input id="clon" inputmode="decimal" placeholder="Lengtegraad (bv. 4.35)"></div><button class="small" style="margin-top:8px" data-act="addcoord">Stop met coördinaten toevoegen</button></details>' +
+    '<button class="locbtn" data-act="stopmap"><span class="lt">🗺️ Bestemming toevoegen op de kaart</span><span class="ls">Zoek een plaats of tik op de kaart. Herhaal dit voor elke stop.</span></button>' +
     '<div class="hint" id="stopmsg"></div></div>' +
     '<label><span class="lbl">Notities</span><textarea data-f="notes" placeholder="Wat willen jullie onthouden?">' + esc(S.F.notes) + '</textarea></label>' +
     '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
@@ -1448,37 +1447,17 @@ function addStop(name, lat, lon) {
   if (!S.F) return;
   if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { stopMsg('Ongeldige coördinaten.', true); return; }
   S.F.stops.push({ name: String(name).trim() || (lat.toFixed(2) + ', ' + lon.toFixed(2)), lat: +lat, lon: +lon });
-  const inp = $('#stopname'); if (inp) inp.value = ''; const sg = $('#sugs'); if (sg) sg.innerHTML = '';
   stopMsg(''); renderStops();
 }
+async function addStopFromPick(lat, lon, label) {
+  const F = S.F; if (!F) return;
+  if (label) { addStop(label, lat, lon); return; }
+  const hold = 'Locatie ' + (+lat).toFixed(3) + ', ' + (+lon).toFixed(3);
+  addStop(hold, lat, lon);
+  const stop = F.stops[F.stops.length - 1], n = await reverseName(lat, lon);
+  if (n && S.F === F && F.stops.indexOf(stop) >= 0 && stop.name === hold) { stop.name = n; renderStops(); }
+}
 function matches(q) { const n = norm(q).trim(); if (!n) return []; const a = PLACES.filter(p => p.n.startsWith(n)), b = PLACES.filter(p => !p.n.startsWith(n) && p.n.includes(n)); return a.concat(b).slice(0, 6); }
-async function geocode(q) {
-  const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=nl&q=' + encodeURIComponent(q));
-  if (!r.ok) throw new Error('geo');
-  const a = await r.json();
-  if (!a.length) return null;
-  const x = a[0];
-  return { name: String(x.display_name || q).split(',').slice(0, 2).join(',').trim(), lat: +x.lat, lon: +x.lon };
-}
-async function addStopFromInput() {
-  const inp = $('#stopname'), q = inp ? inp.value.trim() : ''; if (!q) { stopMsg('Typ eerst een plaatsnaam.', true); return; }
-  const m = matches(q);
-  if (m.length) { addStop(m[0].name, m[0].lat, m[0].lon); return; }
-  stopMsg('Plaats opzoeken…');
-  try {
-    const g = await geocode(q);
-    if (g) { addStop(g.name, g.lat, g.lon); return; }
-    stopMsg('Plaats niet gevonden. Probeer een andere schrijfwijze of vul de coördinaten in.', true);
-  } catch (e) { stopMsg('Opzoeken lukte niet. Controleer je verbinding of vul de coördinaten in.', true); }
-}
-function gps() {
-  if (!navigator.geolocation) { stopMsg('Locatie wordt niet ondersteund op dit toestel.', true); return; }
-  stopMsg('Locatie bepalen…');
-  navigator.geolocation.getCurrentPosition(p => {
-    const inp = $('#stopname'), nm = inp && inp.value.trim();
-    addStop(nm || 'Huidige locatie', p.coords.latitude, p.coords.longitude);
-  }, () => stopMsg('Geen toegang tot je locatie. Geef toestemming in je browser of kies een plaats.', true), { enableHighAccuracy: true, timeout: 12000 });
-}
 function loadImg(file) { return new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); res(i); }; i.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; i.src = u; }); }
 function shrink(img, max, q) { const s = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q); }
 async function prep(file) { const img = await loadImg(file); let full = shrink(img, 1100, .72); if (full.length > 215000) full = shrink(img, 900, .6); if (full.length > 215000) full = shrink(img, 700, .5); return { full, thumb: shrink(img, 220, .6) }; }
@@ -1848,10 +1827,6 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset && t.dataset.f && S.F) S.F[t.dataset.f] = t.value;
-  if (t.id === 'stopname') {
-    const m = matches(t.value), el = $('#sugs');
-    if (el) el.innerHTML = m.map((p, i) => '<button data-act="sug" data-i="' + PLACES.indexOf(p) + '">' + esc(p.name) + '</button>').join('');
-  }
 });
 document.addEventListener('change', async e => {
   if (e.target.id !== 'photoin' || !S.F) return;
@@ -1863,7 +1838,7 @@ document.addEventListener('change', async e => {
   }
   if (msg) msg.textContent = ''; renderPhotos();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'stopname') { e.preventDefault(); addStopFromInput(); } const lb = $('.lightbox'); if (lb && lb._go && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { lb._go(e.key === 'ArrowLeft' ? -1 : 1); return; }
+document.addEventListener('keydown', e => { const lb = $('.lightbox'); if (lb && lb._go && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { lb._go(e.key === 'ArrowLeft' ? -1 : 1); return; }
   if (e.key === 'Escape') { if ($('.picker')) { $('.picker').remove(); return; } if ($('.lightbox')) $('.lightbox').remove(); else if (S.sheetKind) closeSheet(); } });
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
@@ -1885,10 +1860,6 @@ document.addEventListener('click', e => {
     case 'deltrip': confirmSheet('Deze reis en al zijn foto’s worden definitief verwijderd.', 'Ja, verwijder', 'deltrip2', id); break;
     case 'deltrip2': deleteTrip(id); break;
     case 'savetrip': saveTrip(); break;
-    case 'addstop': addStopFromInput(); break;
-    case 'gps': gps(); break;
-    case 'sug': { const p = PLACES[+a.dataset.i]; if (p) addStop(p.name, p.lat, p.lon); break; }
-    case 'addcoord': { const la = parseFloat(($('#clat').value || '').replace(',', '.')), lo = parseFloat(($('#clon').value || '').replace(',', '.')), inp = $('#stopname'); addStop(inp && inp.value.trim() || '', la, lo); $('#clat').value = ''; $('#clon').value = ''; break; }
     case 'stopdel': S.F.stops.splice(+a.dataset.i, 1); renderStops(); break;
     case 'stopup': { const i = +a.dataset.i; if (i > 0) { const s = S.F.stops; [s[i - 1], s[i]] = [s[i], s[i - 1]]; renderStops(); } break; }
     case 'phdel': S.F.newPhotos.splice(+a.dataset.i, 1); renderPhotos(); break;
@@ -1906,7 +1877,8 @@ document.addEventListener('click', e => {
     case 'editspot': openSpotForm(id); break;
     case 'spot': openSpot(id); break;
     case 'savespot': saveSpot(); break;
-    case 'spotmap': openPicker(); break;
+    case 'spotmap': openPicker({ lat: S.F.lat, lon: S.F.lon, onPick: nameFromCoords }); break;
+    case 'stopmap': { const l = S.F.stops[S.F.stops.length - 1]; openPicker({ lat: l ? l.lat : null, lon: l ? l.lon : null, pin: false, onPick: addStopFromPick }); break; }
     case 'spotfav': S.F.fav = !S.F.fav; a.className = 'favbtn' + (S.F.fav ? ' on' : ''); a.textContent = S.F.fav ? '♥ Zeker nog eens naartoe' : '♡ Zeker nog eens naartoe?'; break;
     case 'sfilter': S.spotFav = a.dataset.k === 'fav'; renderView(); break;
     case 'delspot': confirmSheet('Deze spot en al zijn foto’s worden definitief verwijderd.', 'Ja, verwijder', 'delspot2', id); break;
