@@ -1,0 +1,3 @@
+-- Camper Danny: meldingen (Web Push). Al toegepast via de Supabase-koppeling.
+-- Tabellen push_subs en push_config, functie notify_push en triggers op requests en members.
+-- push_config bevat de VAPID-sleutels en het trigger-geheim (niet in deze repo bewaard).

@@ -648,6 +648,7 @@ async function afterLogin(user) {
     }, onErr);
     loadRequests(); startRequestLive();
   }
+  const mh = /^#m-(\w+)$/.exec(location.hash || ''); if (mh) { try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {} setTimeout(() => openFromPush(mh[1]), 600); }
 }
 
 async function boot() {
@@ -1575,11 +1576,13 @@ function openSettings() {
   S.F = { name: S.settings.name || 'Camper Danny', baseKm: S.settings.baseKm ? String(S.settings.baseKm) : '' };
   openSheet('<h2>' + (a ? 'Instellingen' : 'Account') + '</h2>' +
     '<div class="roles"><b>' + esc(S.me.name) + '</b><br>' + esc(S.me.email || '') + '<br>Toegang: ' + esc(ROLES[S.role] || S.role || '') + '</div>' +
+    (S.canWrite && !isGuest() ? '<div class="field" style="margin-top:12px"><span class="lbl">Meldingen op deze telefoon</span><div id="pushbox" class="hint">Laden…</div></div>' : '') +
     (a ? '<label style="margin-top:12px"><span class="lbl">Naam van de camper</span><input id="set-name" data-f="name" placeholder="Camper Danny" value="' + esc(S.F.name) + '"></label>' +
       '<label><span class="lbl">Kilometers vóór dit logboek</span><input id="set-km" type="number" inputmode="decimal" min="0" data-f="baseKm" placeholder="0" value="' + esc(S.F.baseKm) + '"></label>' +
       '<div class="field"><span class="lbl">Leden</span><div id="members" class="hint">Laden…</div></div>' : '') +
     '<div class="actions"><button class="ghost" data-auth="logout">Uitloggen</button>' + (a ? '<button class="primary" data-act="savesettings">Opslaan</button>' : '<button class="primary" data-act="close">Sluit</button>') + '</div>', 'settings');
   if (a) renderMembers();
+  if (S.canWrite && !isGuest()) renderPush();
 }
 async function renderMembers() {
   await loadMembers();
@@ -1592,6 +1595,46 @@ async function renderMembers() {
     '<div class="hint">Nieuwe leden zien niets tot jij ze toegang geeft.</div>';
   renderHeader();
 }
+/* ---------- meldingen (Web Push) ---------- */
+const VAPID_PUBLIC = 'BF8H7QR--l2AzfkYn03AhEhD7Ha1_XpAGqhHX6BBzwDgnPeBM2MYdZ-8HteFrjRAkJjZnaeWroyiOb0hmgcdpgA';
+const pushOk = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+async function pushSub() { try { const reg = await navigator.serviceWorker.ready; return await reg.pushManager.getSubscription(); } catch (e) { return null; } }
+async function renderPush() {
+  const el = $('#pushbox'); if (!el || S.sheetKind !== 'settings') return;
+  if (!pushOk()) { el.innerHTML = isIos() && !isStandalone() ? 'Op iPhone: zet de app eerst op je beginscherm (Deel-knop → “Zet op beginscherm”) en open hem daar. Dan kun je meldingen aanzetten.' : 'Deze browser ondersteunt geen meldingen.'; return; }
+  if (isIos() && !isStandalone()) { el.innerHTML = 'Op iPhone: zet de app eerst op je beginscherm (Deel-knop → “Zet op beginscherm”) en open hem daar. Dan kun je meldingen aanzetten.'; return; }
+  if (Notification.permission === 'denied') { el.innerHTML = 'Meldingen zijn geblokkeerd. Zet ze aan in de instellingen van je telefoon of browser voor deze app.'; return; }
+  const sub = await pushSub();
+  el.className = '';
+  el.innerHTML = sub ? '<div class="hint ok">Aan: je krijgt een melding bij een nieuwe huuraanvraag' + (S.canAdmin ? ' of een nieuw account' : '') + '.</div><button class="small" data-act="pushoff" style="margin-top:6px">Meldingen uitzetten</button>'
+    : '<button class="small" data-act="pushon">Meldingen aanzetten</button><div class="hint">Bij een nieuwe huuraanvraag' + (S.canAdmin ? ' of een nieuw account' : '') + '.</div>';
+}
+async function pushOn() {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Je hebt meldingen niet toegestaan.'); renderPush(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
+    const j = sub.toJSON();
+    const { error } = await S.sb.from('push_subs').upsert({ endpoint: j.endpoint, user_id: S.me.id, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: 'endpoint' });
+    if (error) throw error;
+    toast('Meldingen staan aan ✓');
+  } catch (e) { toast('Meldingen aanzetten lukte niet.'); }
+  renderPush();
+}
+async function pushOff() {
+  try { const sub = await pushSub(); if (sub) { await S.sb.from('push_subs').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); } toast('Meldingen staan uit'); }
+  catch (e) { toast('Uitzetten lukte niet.'); }
+  renderPush();
+}
+function openFromPush(tab) {
+  if (!S.db) return;
+  if (tab === 'requests') { S.reqTab = 'req'; goTab('agenda'); } else if (tab === 'settings' && S.canAdmin) openSettings();
+}
+try { if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && 'cdTab' in e.data) openFromPush(e.data.cdTab); }); } catch (e) {}
 async function changeRole(uid, role) {
   const { error } = await S.sb.from('members').update({ role }).eq('user_id', uid);
   if (error) toast('Aanpassen is niet gelukt.'); else toast('Toegang aangepast ✓');
@@ -1917,6 +1960,8 @@ document.addEventListener('click', e => {
     case 'savetodo': saveTodo(); break;
     case 'deltodo': confirmSheet('Dit punt wordt verwijderd uit de lijst.', 'Ja, verwijder', 'deltodo2', id); break;
     case 'deltodo2': S.db.doc('todos/' + id).delete().then(() => { closeSheet(); toast('Punt verwijderd'); }).catch(dbFail); break;
+    case 'pushon': pushOn(); break;
+    case 'pushoff': pushOff(); break;
     case 'openreq': S.reqTab = 'req'; goTab('agenda'); break;
     case 'reqtab': S.reqTab = a.dataset.k; renderView(); break;
     case 'rqapprove': openDecision(id, true); break;
