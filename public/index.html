@@ -224,6 +224,7 @@ textarea{min-height:70px;resize:vertical}
 .stoprow .num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
 .stoprow .nm{flex:1;min-width:0}
 .stoprow .nm small{display:block;color:var(--muted);font-size:11px}
+.stoprow{touch-action:pan-y;user-select:none;-webkit-user-select:none}.stoprow.drag{position:relative;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.28);border-color:var(--accent);background:var(--card)}.stoprow .grip{flex:none;width:28px;align-self:stretch;display:grid;place-items:center;color:var(--muted);font-size:20px;cursor:grab;touch-action:none}
 .stoprow button{border:0;background:none;color:var(--muted);font-size:18px;padding:2px 6px}
 .addstop{display:flex;gap:8px}
 .addstop button{white-space:nowrap}
@@ -1460,8 +1461,34 @@ async function openTripForm(id) {
 }
 function renderStops() {
   const el = $('#stops'); if (!el || !S.F) return;
-  el.innerHTML = S.F.stops.map((s, i) => '<div class="stoprow"><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(s.name) + '<small>' + s.lat.toFixed(3) + ', ' + s.lon.toFixed(3) + '</small></div><button data-act="stopup" data-i="' + i + '" aria-label="Omhoog"' + (i === 0 ? ' disabled style="opacity:.3"' : '') + '>↑</button><button data-act="stopdel" data-i="' + i + '" aria-label="Verwijder">✕</button></div>').join('');
+  el.innerHTML = S.F.stops.map((s, i) => '<div class="stoprow" data-i="' + i + '"><span class="grip" data-grip aria-label="Sleep om de volgorde te wijzigen" title="Sleep om te verplaatsen">⠿</span><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(s.name) + '<small>' + s.lat.toFixed(3) + ', ' + s.lon.toFixed(3) + '</small></div><button data-act="stopdel" data-i="' + i + '" aria-label="Verwijder">✕</button></div>').join('');
 }
+function stopDrag(e) {
+  const g = e.target.closest && e.target.closest('[data-grip]'); if (!g || !S.F) return;
+  const list = $('#stops'), row = g.closest('.stoprow'); if (!list || !row) return;
+  e.preventDefault();
+  row.classList.add('drag');
+  let lastY = e.clientY, offset = 0;
+  const move = ev => {
+    const dy = ev.clientY - lastY; lastY = ev.clientY; offset += dy;
+    row.style.transform = 'translateY(' + offset + 'px)';
+    for (let guard = 0; guard < 20; guard++) {
+      const rows = [...list.children], r = row.getBoundingClientRect(), mid = r.top + r.height / 2, idx = rows.indexOf(row);
+      const prev = rows[idx - 1], next = rows[idx + 1]; let moved = false;
+      if (prev) { const pr = prev.getBoundingClientRect(); if (mid < pr.top + pr.height / 2) { list.insertBefore(row, prev); offset += pr.height + 6; moved = true; } }
+      if (!moved && next) { const nr = next.getBoundingClientRect(); if (mid > nr.top + nr.height / 2) { list.insertBefore(next, row); offset -= nr.height + 6; moved = true; } }
+      row.style.transform = 'translateY(' + offset + 'px)';
+      if (!moved) break;
+    }
+  };
+  const end = () => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+    const order = [...list.children].map(c => +c.dataset.i);
+    S.F.stops = order.map(i => S.F.stops[i]); renderStops();
+  };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+}
+document.addEventListener('pointerdown', stopDrag);
 function renderPhotos() {
   const el = $('#photos'); if (!el || !S.F) return;
   const ex = S.F.existing.map(p => '<div class="ph' + (S.F.remove[p.id] ? ' gone' : '') + '"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phtoggle" data-id="' + p.id + '" aria-label="Verwijder foto">' + (S.F.remove[p.id] ? '↺' : '✕') + '</button></div>').join('');
