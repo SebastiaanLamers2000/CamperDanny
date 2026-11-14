@@ -747,20 +747,34 @@ function buildGeo(t) {
       const lon = x * sc[0] + tr[0], lat = y * sc[1] + tr[1];
       if (lon >= X0 && lon <= X1 && lat >= Y0 && lat <= Y1) inside = true;
       if (i === a.length - 1 || Math.abs(lon - lx) > TOL || Math.abs(lat - ly) > TOL) {
-        const cx = clamp(lon, X0, X1), cy = clamp(lat, Y0, Y1), q = pts[pts.length - 1];
-        if (!q || q[0] !== cx || q[1] !== cy) pts.push([cx, cy]);
+        const q = pts[pts.length - 1];
+        if (!q || q[0] !== lon || q[1] !== lat) pts.push([lon, lat]); // ruwe waarden; bijsnijden gebeurt per ring (na het ontwarren van de datumgrens)
         lx = lon; ly = lat;
       }
     }
     return { pts, inside };
   });
   const pt = p => (p[0] * K).toFixed(2) + ',' + (-p[1]).toFixed(2);
+  // Een contour die over de datumgrens (180°) loopt springt van +180 naar −180. Zonder ontwarren trekt het bijsnijden daar een lijn dwars over de kaart
+  // (de Tsjoektsjen-kust) en draaien land en zee om. Daarom houden we de lengte aaneengesloten (+/-360) en snijden pas daarna bij.
+  const fit = (pts, X, Y) => {
+    const out = []; let prev = null, off = 0;
+    for (let k = 0; k < pts.length; k++) {
+      let lon = pts[k][0] + off;
+      if (prev !== null) { while (lon - prev > 180) { lon -= 360; off -= 360; } while (prev - lon > 180) { lon += 360; off += 360; } }
+      prev = lon;
+      const cx = clamp(lon, X[0], X[1]), cy = clamp(pts[k][1], Y[0], Y[1]), q = out[out.length - 1];
+      if (!q || q[0] !== cx || q[1] !== cy) out.push([cx, cy]);
+    }
+    return out;
+  };
   const arcPts = i => i < 0 ? arcs[~i].pts.slice().reverse() : arcs[i].pts;
   const geoms = o => !o ? [] : o.geometries ? o.geometries : [o];
   const polys = g => g.type === 'Polygon' ? [g.arcs] : g.type === 'MultiPolygon' ? g.arcs : [];
   const ringD = idx => {
     if (!idx.some(i => arcs[i < 0 ? ~i : i].inside)) return '';
     let pts = []; idx.forEach(i => { const a = arcPts(i); pts = pts.concat(pts.length ? a.slice(1) : a); });
+    pts = fit(pts, [X0, X1], [Y0, Y1]);
     return pts.length > 2 ? 'M' + pts.map(pt).join('L') + 'Z' : '';
   };
   const countries = geoms(t.objects.countries);
@@ -769,7 +783,7 @@ function buildGeo(t) {
   const cnt = new Array(arcs.length).fill(0);
   countries.forEach(g => polys(g).forEach(p => p.forEach(r => r.forEach(i => { cnt[i < 0 ? ~i : i]++; }))));
   let bord = '';
-  cnt.forEach((c, i) => { if (c >= 2 && arcs[i].inside && arcs[i].pts.length > 1) bord += 'M' + arcs[i].pts.map(pt).join('L'); });
+  cnt.forEach((c, i) => { if (c >= 2 && arcs[i].inside && arcs[i].pts.length > 1) bord += 'M' + fit(arcs[i].pts, [X0, X1], [Y0, Y1]).map(pt).join('L'); });
   if (!land) throw new Error('geo');
   return { land, bord };
 }
