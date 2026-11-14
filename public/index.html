@@ -1158,23 +1158,32 @@ async function openNightPhotos(tid, nid, pid) {
   } catch (e) { toast('Foto’s laden is niet gelukt.'); }
 }
 const addDaysStr = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
-async function openNightForm(tid, nid) {
-  const t = S.trips.find(x => x.id === tid); if (!t) return;
-  if (!canEditItem(t)) { toast('Alleen de maker of een beheerder kan dit aanpassen.'); return; }
-  const n = nid ? (t.nights || []).find(x => x.id === nid) : null;
-  const ns = sortedNights(t), last = ns[ns.length - 1];
-  const date = n ? n.date || '' : (last && last.date ? addDaysStr(last.date, 1) : (dayOf(t.start) || todayStr()));
-  S.F = { kind: 'night', tid, nid: nid || null, title: n ? n.name : '', place: n ? n.place || '' : '', lat: n && n.lat != null ? n.lat : null, lon: n && n.lon != null ? n.lon : null, locFor: n ? n.place || '' : '',
-    date, notes: n ? n.notes || '' : '', newPhotos: [], existing: [], remove: {}, saving: false };
-  openSheet('<h2>' + esc(t.title) + '</h2><div class="tmeta" style="margin-top:-6px">' + (n ? 'Nacht bewerken' : 'Nieuwe nacht') + '</div>' +
+const nightSort = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.at || 0) - (b.at || 0);
+const nightStops = ns => ns.slice().sort(nightSort).filter(n => n.lat != null && n.lon != null).map(n => ({ name: n.name, lat: +n.lat, lon: +n.lon, night: n.id }));
+const stopsWithNights = (stops, ns) => (stops || []).filter(s => !s.night).concat(nightStops(ns || []));
+const draftPhotoCount = n => Math.max(0, (n.photoCount || 0) - Object.keys(n.remove || {}).filter(k => n.remove[k]).length) + (n.newPhotos || []).length;
+async function openNightForm(tid, nid, draft) {
+  let t = null, n = null, ns;
+  if (draft) { const T = S.F; if (!T || !T.nights) return; S.TF = T; ns = T.nights.slice().sort(nightSort); n = nid ? T.nights.find(x => x.id === nid) : null; }
+  else {
+    t = S.trips.find(x => x.id === tid); if (!t) return;
+    if (!canEditItem(t)) { toast('Alleen de maker of een beheerder kan dit aanpassen.'); return; }
+    n = nid ? (t.nights || []).find(x => x.id === nid) : null; ns = sortedNights(t);
+  }
+  const last = ns[ns.length - 1], startDay = draft ? dayOf(S.TF.start) : dayOf(t.start);
+  const date = n ? n.date || '' : (last && last.date ? addDaysStr(last.date, 1) : (startDay || todayStr()));
+  const title = draft ? (S.TF.title || 'Nieuwe reis') : t.title;
+  S.F = { kind: 'night', draft: !!draft, tid: draft ? S.TF.id : tid, nid: nid || null, title: n ? n.name : '', place: n ? n.place || '' : '', lat: n && n.lat != null ? n.lat : null, lon: n && n.lon != null ? n.lon : null, locFor: n ? n.place || '' : '',
+    date, notes: n ? n.notes || '' : '', newPhotos: n && n.newPhotos ? n.newPhotos.slice() : [], existing: [], remove: n && n.remove ? Object.assign({}, n.remove) : {}, saving: false };
+  openSheet('<h2>' + esc(title) + '</h2><div class="tmeta" style="margin-top:-6px">' + (n ? 'Slaapplaats bewerken' : 'Nieuwe slaapplaats') + '</div>' +
     '<label><span class="lbl">Datum van de nacht</span><input type="date" data-f="date" value="' + esc(date) + '"></label>' +
-    '<div class="field"><span class="lbl">Plek</span><button class="locbtn" id="spotlocbtn" data-act="nightmap">' + locBtnHTML(S.F) + '</button></div>' +
+    '<div class="field"><span class="lbl">Locatie</span><button class="locbtn" id="spotlocbtn" data-act="nightmap">' + locBtnHTML(S.F) + '</button></div>' +
     '<label><span class="lbl">Naam van de plek</span><input id="ntitle" data-f="title" placeholder="bv. Camping aan het meer" value="' + esc(S.F.title) + '"></label>' +
     '<label><span class="lbl">Commentaar</span><textarea data-f="notes" placeholder="Hoe was het? Uitzicht, prijs, tips, wat jullie deden…">' + esc(S.F.notes) + '</textarea></label>' +
     '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
-    '<div class="actions">' + (n && canDeleteItem(t) ? '<button class="danger" data-act="delnight" data-id="' + tid + '" data-n="' + nid + '">Verwijder</button>' : '') + '<button class="ghost" data-act="nightcancel" data-id="' + tid + '">Annuleer</button><button class="primary" id="savebtn" data-act="savenight">Opslaan</button></div>', 'nightform', tid);
+    '<div class="actions">' + (n && (draft || canDeleteItem(t)) ? '<button class="danger" data-act="delnight" data-id="' + esc(tid || '') + '" data-n="' + nid + '">Verwijder</button>' : '') + '<button class="ghost" data-act="nightcancel" data-id="' + esc(tid || '') + '">Annuleer</button><button class="primary" id="savebtn" data-act="savenight">' + (draft ? 'Klaar' : 'Opslaan') + '</button></div>', 'nightform', tid);
   renderPhotos();
-  if (n && n.photoCount && S.db) {
+  if (n && n.photoCount && S.db && tid) {
     try {
       const all = await loadPhotoList('trips', tid);
       if (S.F && S.F.nid === nid && S.F.tid === tid) { S.F.existing = all.filter(x => x.night === nid).map(x => ({ id: x.id, thumb: x.thumb || x.data, at: x.at })); renderPhotos(); }
@@ -1186,31 +1195,47 @@ async function nightPick(lat, lon, label) {
   await nameFromCoords(lat, lon, label);
   if (S.F === F && !F.title.trim() && F.place && !/^Locatie /.test(F.place)) { F.title = F.place.split(',')[0].trim(); const i = $('#ntitle'); if (i) i.value = F.title; }
 }
+// schrijft de foto-wijzigingen van één nacht weg en geeft het bijgewerkte nacht-object terug
+async function commitNight(tid, n, onProgress) {
+  let thumbs = (n.thumbs || []).slice(), count = n.photoCount || 0;
+  for (const pid of Object.keys(n.remove || {})) { if (!n.remove[pid]) continue; await S.db.doc('trips/' + tid + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
+  const np = n.newPhotos || [];
+  for (let i = 0; i < np.length; i++) {
+    if (onProgress) onProgress(i + 1, np.length);
+    const pr = S.db.collection('trips/' + tid + '/photos').doc();
+    await pr.set({ data: np[i].full, thumb: np[i].thumb, at: Date.now() + i, by: S.me ? S.me.id : null, night: n.id });
+    count++; if (thumbs.length < 3) thumbs.push({ id: pr.id, t: np[i].thumb });
+  }
+  return { id: n.id, date: n.date, name: n.name, place: n.place, lat: n.lat, lon: n.lon, notes: n.notes, thumbs, photoCount: count, at: n.at };
+}
 async function saveNight() {
   const F = S.F; if (!F || F.saving) return;
-  const t = S.trips.find(x => x.id === F.tid); if (!t) return;
   const name = F.title.trim() || (F.place && !/^Locatie /.test(F.place) ? F.place.split(',')[0].trim() : '');
   if (!name) { toast('Geef de plek een naam.'); return; }
   if (!F.date) { toast('Kies de datum van de nacht.'); return; }
+  if (F.lat == null || F.lon == null) { toast('Kies eerst de locatie op de kaart.'); return; }
+  if (F.draft) {
+    // tijdens het maken of bewerken van een reis: alleen onthouden, de reis schrijft alles weg bij “Opslaan”
+    const T = S.TF; if (!T) return;
+    const old = F.nid ? T.nights.find(x => x.id === F.nid) : null;
+    const item = { id: F.nid || newId(), date: F.date, name, place: F.place.trim() || name, lat: +F.lat, lon: +F.lon, notes: F.notes.trim(), thumbs: old ? old.thumbs || [] : [], photoCount: old ? old.photoCount || 0 : 0,
+      at: old ? (old.at || Date.now()) : Date.now(), newPhotos: F.newPhotos, remove: F.remove };
+    if (old) T.nights[T.nights.indexOf(old)] = item; else T.nights.push(item);
+    S.F = T; S.TF = null; showTripForm(); return;
+  }
+  const t = S.trips.find(x => x.id === F.tid); if (!t) return;
   F.saving = true; const btn = $('#savebtn'); btn.disabled = true; btn.textContent = 'Opslaan…';
   try {
     const nights = (t.nights || []).map(x => Object.assign({}, x));
     const old = F.nid ? nights.find(x => x.id === F.nid) : null, nid = F.nid || newId();
-    let thumbs = old && old.thumbs ? old.thumbs.slice() : [], count = old && old.photoCount ? old.photoCount : 0;
-    for (const pid of Object.keys(F.remove)) { if (!F.remove[pid]) continue; await S.db.doc('trips/' + F.tid + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
-    for (let i = 0; i < F.newPhotos.length; i++) {
-      btn.textContent = 'Foto ' + (i + 1) + '/' + F.newPhotos.length + '…';
-      const p = F.newPhotos[i], pr = S.db.collection('trips/' + F.tid + '/photos').doc();
-      await pr.set({ data: p.full, thumb: p.thumb, at: Date.now() + i, by: S.me ? S.me.id : null, night: nid });
-      count++; if (thumbs.length < 3) thumbs.push({ id: pr.id, t: p.thumb });
-    }
-    // na het verwijderen van foto's de miniaturen aanvullen met nog bestaande foto's is niet nodig: de rest blijft in de galerij zichtbaar
+    const item = await commitNight(F.tid, { id: nid, date: F.date, name, place: F.place.trim() || name, lat: +F.lat, lon: +F.lon, notes: F.notes.trim(), thumbs: old ? old.thumbs : [], photoCount: old ? old.photoCount || 0 : 0,
+      at: old ? (old.at || Date.now()) : Date.now(), newPhotos: F.newPhotos, remove: F.remove }, (i, n) => { btn.textContent = 'Foto ' + i + '/' + n + '…'; });
     delete S.photoCache[F.tid];
-    const item = { id: nid, date: F.date, name, place: F.place.trim() || name, lat: F.lat != null ? +F.lat : null, lon: F.lon != null ? +F.lon : null, notes: F.notes.trim(), thumbs, photoCount: count, at: old ? (old.at || Date.now()) : Date.now() };
     if (old) nights[nights.indexOf(old)] = item; else nights.push(item);
-    await S.db.doc('trips/' + F.tid).update({ nights });
-    t.nights = nights;
-    const tid = F.tid; closeSheet(); toast(old ? 'Nacht bijgewerkt' : 'Nacht toegevoegd ✓'); openDetail(tid);
+    const stops = stopsWithNights(t.stops, nights);
+    await S.db.doc('trips/' + F.tid).update({ nights, stops });
+    t.nights = nights; t.stops = stops; M.fitted = false;
+    const tid = F.tid; closeSheet(); toast(old ? 'Slaapplaats bijgewerkt' : 'Slaapplaats toegevoegd ✓'); openDetail(tid);
   } catch (e) { F.saving = false; btn.disabled = false; btn.textContent = 'Opslaan'; dbFail(e); }
 }
 async function deleteNight(tid, nid) {
@@ -1218,8 +1243,8 @@ async function deleteNight(tid, nid) {
   try {
     const all = await loadPhotoList('trips', tid);
     for (const p of all.filter(x => x.night === nid)) await S.db.doc('trips/' + tid + '/photos/' + p.id).delete();
-    const nights = (t.nights || []).filter(x => x.id !== nid);
-    await S.db.doc('trips/' + tid).update({ nights }); t.nights = nights; delete S.photoCache[tid];
+    const nights = (t.nights || []).filter(x => x.id !== nid), stops = stopsWithNights(t.stops, nights);
+    await S.db.doc('trips/' + tid).update({ nights, stops }); t.nights = nights; t.stops = stops; delete S.photoCache[tid]; M.fitted = false;
     closeSheet(); toast('Nacht verwijderd'); openDetail(tid);
   } catch (e) { dbFail(e); }
 }
@@ -1564,26 +1589,38 @@ function openGallery(items, start) {
 async function openTripForm(id) {
   const t = id ? S.trips.find(x => x.id === id) : null;
   S.F = { id: id || null, title: t ? t.title : '', start: t ? t.start || '' : '', end: t ? t.end || '' : '', km: t && t.km ? String(t.km) : '', notes: t ? t.notes || '' : '',
-    stops: t ? (t.stops || []).map(s => Object.assign({}, s)) : [], newPhotos: [], existing: [], remove: {}, saving: false };
+    stops: t ? (t.stops || []).filter(s => !s.night).map(s => Object.assign({}, s)) : [], nights: t ? (t.nights || []).map(n => Object.assign({}, n, { newPhotos: [], remove: {} })) : [], delNights: [],
+    newPhotos: [], existing: [], remove: {}, saving: false };
   if (!t) { const d = new Date(); d.setMinutes(0, 0, 0); S.F.start = ymd(d) + 'T' + pad(d.getHours()) + ':00'; }
-  const html = '<h2>' + (t ? 'Reis bewerken' : 'Nieuwe reis') + '</h2>' +
-    '<label><span class="lbl">Titel</span><input data-f="title" placeholder="bv. Weekend Ardennen" value="' + esc(S.F.title) + '"></label>' +
-    '<div class="row2"><label><span class="lbl">Vertrek</span><input type="datetime-local" data-f="start" value="' + esc(S.F.start) + '"></label><label><span class="lbl">Terug</span><input type="datetime-local" data-f="end" value="' + esc(S.F.end) + '"></label></div>' +
-    '<label><span class="lbl">Gereden kilometers</span><input type="number" inputmode="decimal" min="0" data-f="km" placeholder="bv. 412" value="' + esc(S.F.km) + '"></label>' +
-    '<div class="field"><span class="lbl">Bestemmingen (in volgorde)</span><div id="stops"></div>' +
-    '<button class="locbtn" data-act="stopmap"><span class="lt">🗺️ Bestemming toevoegen op de kaart</span><span class="ls">Zoek een plaats of tik op de kaart. Herhaal dit voor elke stop.</span></button>' +
-    '<div class="hint" id="stopmsg"></div></div>' +
-    '<label><span class="lbl">Notities</span><textarea data-f="notes" placeholder="Wat willen jullie onthouden?">' + esc(S.F.notes) + '</textarea></label>' +
-    '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
-    '<div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="primary" id="savebtn" data-act="savetrip">Opslaan</button></div>';
-  openSheet(html, 'form', id);
-  renderStops(); renderPhotos();
+  showTripForm();
   if (t && t.photoCount && S.db) {
     try {
       const snap = await S.db.collection('trips/' + id + '/photos').get();
       if (S.F && S.F.id === id) { S.F.existing = snap.docs.filter(d => !d.data().night).map(d => ({ id: d.id, thumb: d.data().thumb || d.data().data, at: d.data().at || 0 })).sort((a, b) => a.at - b.at); renderPhotos(); }
     } catch (e) {}
   }
+}
+function showTripForm() {
+  const F = S.F, t = F.id ? S.trips.find(x => x.id === F.id) : null;
+  const html = '<h2>' + (t ? 'Reis bewerken' : 'Nieuwe reis') + '</h2>' +
+    '<label><span class="lbl">Titel</span><input data-f="title" placeholder="bv. Weekend Ardennen" value="' + esc(F.title) + '"></label>' +
+    '<div class="row2"><label><span class="lbl">Vertrek</span><input type="datetime-local" data-f="start" value="' + esc(F.start) + '"></label><label><span class="lbl">Terug</span><input type="datetime-local" data-f="end" value="' + esc(F.end) + '"></label></div>' +
+    '<label><span class="lbl">Gereden kilometers</span><input type="number" inputmode="decimal" min="0" data-f="km" placeholder="bv. 412" value="' + esc(F.km) + '"></label>' +
+    '<div class="field"><span class="lbl">Slaapplaatsen (per nacht)</span><div id="nightsdraft"></div>' +
+    '<button class="locbtn" data-act="draftnight"><span class="lt">＋ Slaapplaats toevoegen</span><span class="ls">Locatie op de kaart, foto’s en commentaar. Herhaal dit voor elke nacht.</span></button></div>' +
+    (F.stops.length ? '<div class="field"><span class="lbl">Eerdere bestemmingen</span><div id="stops"></div></div>' : '') +
+    '<label><span class="lbl">Notities</span><textarea data-f="notes" placeholder="Wat willen jullie onthouden?">' + esc(F.notes) + '</textarea></label>' +
+    '<div class="field"><span class="lbl">Foto’s van de reis</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
+    '<div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="primary" id="savebtn" data-act="savetrip">Opslaan</button></div>';
+  openSheet(html, 'form', F.id);
+  renderStops(); renderNightsDraft(); renderPhotos();
+  const sh = $('#sheet .sheet'); if (sh && S.formScroll) { sh.scrollTop = S.formScroll; S.formScroll = 0; }
+}
+function renderNightsDraft() {
+  const el = $('#nightsdraft'); if (!el || !S.F || !S.F.nights) return;
+  const ns = S.F.nights.slice().sort(nightSort);
+  el.innerHTML = ns.map((n, i) => '<div class="stoprow"><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(n.name) + '<small>' + esc(fmtDate(n.date)) + (n.place && n.place !== n.name ? ' · ' + esc(n.place) : '') + ' · ' + draftPhotoCount(n) + ' foto’s</small></div>' +
+    '<button data-act="draftedit" data-n="' + n.id + '" aria-label="Bewerk">✎</button><button data-act="draftdel" data-n="' + n.id + '" aria-label="Verwijder">✕</button></div>').join('');
 }
 function renderStops() {
   const el = $('#stops'); if (!el || !S.F) return;
@@ -1660,7 +1697,11 @@ async function saveTrip() {
       count++; if (thumbs.length < 4) thumbs.push({ id: pr.id, t: p.thumb });
     }
     delete S.photoCache[id];
-    const doc = { title, start: F.start, end: F.end || '', km: Math.max(0, parseFloat(String(F.km).replace(',', '.')) || 0), notes: F.notes.trim(), stops: F.stops, thumbs, photoCount: count, nights: old && old.nights ? old.nights : [],
+    // slaapplaatsen: verwijderde nachten wissen, foto's van de overige wegschrijven
+    for (const nid of F.delNights || []) { const all = await loadPhotoList('trips', id); for (const ph of all.filter(x => x.night === nid)) await S.db.doc('trips/' + id + '/photos/' + ph.id).delete(); }
+    const nights = [];
+    for (const n of F.nights.slice().sort(nightSort)) { btn.textContent = 'Slaapplaats ' + (nights.length + 1) + '…'; nights.push(await commitNight(id, n, (i, k) => { btn.textContent = 'Foto ' + i + '/' + k + '…'; })); }
+    const doc = { title, start: F.start, end: F.end || '', km: Math.max(0, parseFloat(String(F.km).replace(',', '.')) || 0), notes: F.notes.trim(), stops: stopsWithNights(F.stops, nights), thumbs, photoCount: count, nights,
       by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() };
     await ref.set(doc);
     closeSheet(); toast(old ? 'Reis bijgewerkt' : 'Reis opgeslagen ✓ Voeg nu de nachten toe');
@@ -2084,8 +2125,12 @@ document.addEventListener('click', e => {
     case 'editnight': openNightForm(id, a.dataset.n); break;
     case 'nightmap': openPicker({ lat: S.F.lat, lon: S.F.lon, onPick: nightPick }); break;
     case 'savenight': saveNight(); break;
-    case 'nightcancel': openDetail(id); break;
-    case 'delnight': openSheet('<h2>Zeker weten?</h2><p style="margin:0 0 4px">Deze nacht en de foto’s ervan worden verwijderd.</p><div class="actions"><button class="ghost" data-act="nightcancel" data-id="' + esc(id) + '">Annuleer</button><button class="danger" data-act="delnight2" data-id="' + esc(id) + '" data-n="' + esc(a.dataset.n) + '">Verwijder</button></div>', 'confirm'); break;
+    case 'nightcancel': if (S.F && S.F.draft && S.TF) { S.F = S.TF; S.TF = null; showTripForm(); } else openDetail(id); break;
+    case 'draftnight': { const sh = $('#sheet .sheet'); S.formScroll = sh ? sh.scrollTop : 0; openNightForm(S.F.id, null, true); break; }
+    case 'draftedit': { const sh = $('#sheet .sheet'); S.formScroll = sh ? sh.scrollTop : 0; openNightForm(S.F.id, a.dataset.n, true); break; }
+    case 'draftdel': { const F = S.F, i = F.nights.findIndex(x => x.id === a.dataset.n); if (i >= 0) { const n = F.nights[i]; if (n.photoCount && F.id) F.delNights.push(n.id); F.nights.splice(i, 1); renderNightsDraft(); } break; }
+    case 'delnight': if (S.F && S.F.draft && S.TF) { const T = S.TF, i = T.nights.findIndex(x => x.id === S.F.nid); if (i >= 0) { const n = T.nights[i]; if (n.photoCount && T.id) T.delNights.push(n.id); T.nights.splice(i, 1); } S.F = T; S.TF = null; showTripForm(); break; }
+      openSheet('<h2>Zeker weten?</h2><p style="margin:0 0 4px">Deze nacht en de foto’s ervan worden verwijderd.</p><div class="actions"><button class="ghost" data-act="nightcancel" data-id="' + esc(id) + '">Annuleer</button><button class="danger" data-act="delnight2" data-id="' + esc(id) + '" data-n="' + esc(a.dataset.n) + '">Verwijder</button></div>', 'confirm'); break;
     case 'delnight2': deleteNight(id, a.dataset.n); break;
     case 'deltrip': confirmSheet('Deze reis en al zijn foto’s worden definitief verwijderd.', 'Ja, verwijder', 'deltrip2', id); break;
     case 'deltrip2': deleteTrip(id); break;
@@ -2147,6 +2192,7 @@ function goTab(t, fromBack) {
 function handleBack() {
   const lb = $('.lightbox'); if (lb) { lb.remove(); return true; }
   const pk = $('.picker'); if (pk) { pk.remove(); return true; }
+  if (S.F && S.F.draft && S.TF && $('#sheet .sheet')) { S.F = S.TF; S.TF = null; showTripForm(); return true; }
   if ($('#sheet .sheet')) { closeSheet(); return true; }
   if ($('#reqform')) { closeRequest(); return true; }
   if (S.db && S.tabHist.length) { goTab(S.tabHist.pop(), true); return true; }
