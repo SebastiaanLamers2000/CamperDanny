@@ -248,6 +248,19 @@ details summary{color:var(--muted);cursor:pointer}
 .dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
 .dgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
 .kv{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.ntl{position:relative;margin:6px 0 12px;padding-left:22px}
+.ntl:before{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:2px;background:var(--line)}
+.tli{position:relative;padding-bottom:14px}.tli:last-child{padding-bottom:0}
+.tld{position:absolute;left:-22px;top:5px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--card,var(--bg))}
+.tlb{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tlh{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tlk{font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.tle{border:0;background:none;color:var(--accent);font-size:13px;padding:2px 4px}
+.tlb h4{margin:2px 0;font-size:16px}.tlb .m{font-size:12.5px;color:var(--muted)}
+.tlb .n{white-space:pre-wrap;font-size:14px;margin:6px 0}
+.tlb .dgrid{grid-template-columns:repeat(auto-fill,minmax(72px,1fr));margin:8px 0 4px}
+.tlb .more{display:grid;place-items:center;aspect-ratio:1;border-radius:10px;border:1px solid var(--line);color:var(--muted);font-size:14px;background:var(--bg);cursor:zoom-in}
+.tll{display:inline-block;font-size:13px;color:var(--accent);margin-top:4px}
 .notes{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10px 12px;margin:8px 0}
 .lightbox{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.94)}
 .lbtrack{display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -1099,6 +1112,104 @@ function openSheet(html, kind, id) {
 }
 function closeSheet() { S.sheetKind = ''; S.sheetId = null; S.F = null; $('#sheet').innerHTML = ''; }
 
+/* ---------- nachten (tijdlijn binnen een reis) ---------- */
+const tripPhotoTotal = t => (t.photoCount || 0) + (t.nights || []).reduce((a, n) => a + (n.photoCount || 0), 0);
+const sortedNights = t => (t.nights || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.at || 0) - (b.at || 0));
+function nightsHTML(t) {
+  const ns = sortedNights(t), can = canEditItem(t);
+  let h = '<div class="lbl" style="margin-top:14px">Tijdlijn per nacht</div>';
+  if (!ns.length) h += '<div class="hint" style="margin-bottom:8px">' + (can ? 'Nog geen nachten. Voeg per nacht de plek toe, met foto’s en een opmerking.' : 'Nog geen nachten toegevoegd.') + '</div>';
+  else h += '<div class="ntl">' + ns.map((n, i) => {
+    const th = (n.thumbs || []).map(x => '<img alt="" src="' + esc(x.t) + '" data-act="nlightbox" data-t="' + t.id + '" data-n="' + n.id + '" data-p="' + x.id + '">').join('');
+    const more = (n.photoCount || 0) > (n.thumbs || []).length ? '<div class="more" data-act="nlightbox" data-t="' + t.id + '" data-n="' + n.id + '" data-p="">+' + (n.photoCount - n.thumbs.length) + '</div>' : '';
+    return '<div class="tli"><span class="tld"></span><div class="tlb"><div class="tlh"><span class="tlk">Nacht ' + (i + 1) + (n.date ? ' · ' + esc(fmtDate(n.date)) : '') + '</span>' +
+      (can ? '<button class="tle" data-act="editnight" data-id="' + t.id + '" data-n="' + n.id + '">Bewerk</button>' : '') + '</div>' +
+      '<h4>' + esc(n.name) + '</h4>' + (n.place && n.place !== n.name ? '<div class="m">📍 ' + esc(n.place) + '</div>' : '') +
+      (n.notes ? '<div class="n">' + esc(n.notes) + '</div>' : '') + (th ? '<div class="dgrid">' + th + more + '</div>' : '') +
+      (hasLoc(n) ? '<a class="tll" href="' + esc(spotLink(n)) + '" target="_blank" rel="noopener">Open in Google Maps</a>' : '') + '</div></div>';
+  }).join('') + '</div>';
+  if (can) h += '<button class="locbtn" data-act="newnight" data-id="' + t.id + '" style="margin-bottom:6px"><span class="lt">＋ Nacht toevoegen</span><span class="ls">Plek, foto’s en commentaar van die nacht</span></button>';
+  return h;
+}
+async function loadPhotoList(kind, id) {
+  const snap = await S.db.collection(kind + '/' + id + '/photos').get();
+  return snap.docs.map(d => ({ id: d.id, data: d.data().data, thumb: d.data().thumb, at: d.data().at || 0, night: d.data().night || '' })).sort((a, b) => a.at - b.at);
+}
+async function openNightPhotos(tid, nid, pid) {
+  try {
+    let l = S.photoCache[tid];
+    if (!l) { toast('Foto’s laden…'); l = { n: -1, items: await loadPhotoList('trips', tid) }; S.photoCache[tid] = l; }
+    const items = l.items.filter(x => x.night === nid); if (!items.length) return;
+    openGallery(items, Math.max(0, items.findIndex(x => x.id === pid)));
+  } catch (e) { toast('Foto’s laden is niet gelukt.'); }
+}
+const addDaysStr = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
+async function openNightForm(tid, nid) {
+  const t = S.trips.find(x => x.id === tid); if (!t) return;
+  if (!canEditItem(t)) { toast('Alleen de maker of een beheerder kan dit aanpassen.'); return; }
+  const n = nid ? (t.nights || []).find(x => x.id === nid) : null;
+  const ns = sortedNights(t), last = ns[ns.length - 1];
+  const date = n ? n.date || '' : (last && last.date ? addDaysStr(last.date, 1) : (dayOf(t.start) || todayStr()));
+  S.F = { kind: 'night', tid, nid: nid || null, title: n ? n.name : '', place: n ? n.place || '' : '', lat: n && n.lat != null ? n.lat : null, lon: n && n.lon != null ? n.lon : null, locFor: n ? n.place || '' : '',
+    date, notes: n ? n.notes || '' : '', newPhotos: [], existing: [], remove: {}, saving: false };
+  openSheet('<h2>' + esc(t.title) + '</h2><div class="tmeta" style="margin-top:-6px">' + (n ? 'Nacht bewerken' : 'Nieuwe nacht') + '</div>' +
+    '<label><span class="lbl">Datum van de nacht</span><input type="date" data-f="date" value="' + esc(date) + '"></label>' +
+    '<div class="field"><span class="lbl">Plek</span><button class="locbtn" id="spotlocbtn" data-act="nightmap">' + locBtnHTML(S.F) + '</button></div>' +
+    '<label><span class="lbl">Naam van de plek</span><input id="ntitle" data-f="title" placeholder="bv. Camping aan het meer" value="' + esc(S.F.title) + '"></label>' +
+    '<label><span class="lbl">Commentaar</span><textarea data-f="notes" placeholder="Hoe was het? Uitzicht, prijs, tips, wat jullie deden…">' + esc(S.F.notes) + '</textarea></label>' +
+    '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
+    '<div class="actions">' + (n && canDeleteItem(t) ? '<button class="danger" data-act="delnight" data-id="' + tid + '" data-n="' + nid + '">Verwijder</button>' : '') + '<button class="ghost" data-act="nightcancel" data-id="' + tid + '">Annuleer</button><button class="primary" id="savebtn" data-act="savenight">Opslaan</button></div>', 'nightform', tid);
+  renderPhotos();
+  if (n && n.photoCount && S.db) {
+    try {
+      const all = await loadPhotoList('trips', tid);
+      if (S.F && S.F.nid === nid && S.F.tid === tid) { S.F.existing = all.filter(x => x.night === nid).map(x => ({ id: x.id, thumb: x.thumb || x.data, at: x.at })); renderPhotos(); }
+    } catch (e) {}
+  }
+}
+async function nightPick(lat, lon, label) {
+  const F = S.F; if (!F) return;
+  await nameFromCoords(lat, lon, label);
+  if (S.F === F && !F.title.trim() && F.place && !/^Locatie /.test(F.place)) { F.title = F.place.split(',')[0].trim(); const i = $('#ntitle'); if (i) i.value = F.title; }
+}
+async function saveNight() {
+  const F = S.F; if (!F || F.saving) return;
+  const t = S.trips.find(x => x.id === F.tid); if (!t) return;
+  const name = F.title.trim() || (F.place && !/^Locatie /.test(F.place) ? F.place.split(',')[0].trim() : '');
+  if (!name) { toast('Geef de plek een naam.'); return; }
+  if (!F.date) { toast('Kies de datum van de nacht.'); return; }
+  F.saving = true; const btn = $('#savebtn'); btn.disabled = true; btn.textContent = 'Opslaan…';
+  try {
+    const nights = (t.nights || []).map(x => Object.assign({}, x));
+    const old = F.nid ? nights.find(x => x.id === F.nid) : null, nid = F.nid || newId();
+    let thumbs = old && old.thumbs ? old.thumbs.slice() : [], count = old && old.photoCount ? old.photoCount : 0;
+    for (const pid of Object.keys(F.remove)) { if (!F.remove[pid]) continue; await S.db.doc('trips/' + F.tid + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
+    for (let i = 0; i < F.newPhotos.length; i++) {
+      btn.textContent = 'Foto ' + (i + 1) + '/' + F.newPhotos.length + '…';
+      const p = F.newPhotos[i], pr = S.db.collection('trips/' + F.tid + '/photos').doc();
+      await pr.set({ data: p.full, thumb: p.thumb, at: Date.now() + i, by: S.me ? S.me.id : null, night: nid });
+      count++; if (thumbs.length < 3) thumbs.push({ id: pr.id, t: p.thumb });
+    }
+    // na het verwijderen van foto's de miniaturen aanvullen met nog bestaande foto's is niet nodig: de rest blijft in de galerij zichtbaar
+    delete S.photoCache[F.tid];
+    const item = { id: nid, date: F.date, name, place: F.place.trim() || name, lat: F.lat != null ? +F.lat : null, lon: F.lon != null ? +F.lon : null, notes: F.notes.trim(), thumbs, photoCount: count, at: old ? (old.at || Date.now()) : Date.now() };
+    if (old) nights[nights.indexOf(old)] = item; else nights.push(item);
+    await S.db.doc('trips/' + F.tid).update({ nights });
+    t.nights = nights;
+    const tid = F.tid; closeSheet(); toast(old ? 'Nacht bijgewerkt' : 'Nacht toegevoegd ✓'); openDetail(tid);
+  } catch (e) { F.saving = false; btn.disabled = false; btn.textContent = 'Opslaan'; dbFail(e); }
+}
+async function deleteNight(tid, nid) {
+  const t = S.trips.find(x => x.id === tid); if (!t) return;
+  try {
+    const all = await loadPhotoList('trips', tid);
+    for (const p of all.filter(x => x.night === nid)) await S.db.doc('trips/' + tid + '/photos/' + p.id).delete();
+    const nights = (t.nights || []).filter(x => x.id !== nid);
+    await S.db.doc('trips/' + tid).update({ nights }); t.nights = nights; delete S.photoCache[tid];
+    closeSheet(); toast('Nacht verwijderd'); openDetail(tid);
+  } catch (e) { dbFail(e); }
+}
+
 /* trip detail */
 async function openDetail(id, soft) {
   const t = S.trips.find(x => x.id === id);
@@ -1108,11 +1219,12 @@ async function openDetail(id, soft) {
   const html = '<h2>' + esc(t.title) + '</h2><div class="tmeta" style="margin-top:-6px">' + esc(fmtRange(t.start, t.end, true)) + (n ? ' · ' + n + (n === 1 ? ' nacht' : ' nachten') : '') + (t.by ? ' · toegevoegd door ' + esc(nameOf(t.by)) : '') + '</div>' +
     '<div class="kv">' + (t.km ? '<span class="pill km">' + fmtNum(t.km) + ' km</span>' : '') + (t.stops || []).map((s, i) => '<span class="pill">' + (i + 1) + '. ' + esc(s.name) + '</span>').join('') + '</div>' +
     (t.notes ? '<div class="notes">' + esc(t.notes) + '</div>' : '') +
-    (t.photoCount ? '<div class="lbl">Foto’s</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
+    nightsHTML(t) +
+    (t.photoCount ? '<div class="lbl">Foto’s van de reis</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
     '<div class="actions">' + (canDeleteItem(t) ? '<button class="danger" data-act="deltrip" data-id="' + id + '">Verwijder</button>' : '') + (canEditItem(t) ? '<button class="ghost" data-act="edittrip" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
   openSheet(html, 'detail', id);
   if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
-  if (t.photoCount && S.db) showPhotos('trips', id, t.photoCount);
+  if (t.photoCount && S.db) showPhotos('trips', id, tripPhotoTotal(t));
 }
 
 /* ---------- spots (leuke overnachtingsplekken) ---------- */
@@ -1156,11 +1268,11 @@ async function showPhotos(kind, id, count) {
     let list = S.photoCache[id];
     if (!list || list.n !== count) {
       const snap = await S.db.collection(kind + '/' + id + '/photos').get();
-      list = { n: count, items: snap.docs.map(d => ({ id: d.id, data: d.data().data, thumb: d.data().thumb, at: d.data().at || 0 })).sort((a, b) => a.at - b.at) };
+      list = { n: count, items: snap.docs.map(d => ({ id: d.id, data: d.data().data, thumb: d.data().thumb, at: d.data().at || 0, night: d.data().night || '' })).sort((a, b) => a.at - b.at) };
       S.photoCache[id] = list;
     }
     const el = $('#dphotos');
-    if (el && S.sheetId === id) el.innerHTML = list.items.map(p => '<img alt="" src="' + esc(p.thumb || p.data) + '" data-act="lightbox" data-id="' + id + '" data-p="' + p.id + '">').join('');
+    if (el && S.sheetId === id) el.innerHTML = list.items.filter(p => !p.night).map(p => '<img alt="" src="' + esc(p.thumb || p.data) + '" data-act="lightbox" data-id="' + id + '" data-p="' + p.id + '">').join('');
   } catch (e) { const el = $('#dphotos'); if (el) el.innerHTML = '<div class="hint err">Foto’s laden is niet gelukt.</div>'; }
 }
 async function openSpotForm(id) {
@@ -1455,7 +1567,7 @@ async function openTripForm(id) {
   if (t && t.photoCount && S.db) {
     try {
       const snap = await S.db.collection('trips/' + id + '/photos').get();
-      if (S.F && S.F.id === id) { S.F.existing = snap.docs.map(d => ({ id: d.id, thumb: d.data().thumb || d.data().data, at: d.data().at || 0 })).sort((a, b) => a.at - b.at); renderPhotos(); }
+      if (S.F && S.F.id === id) { S.F.existing = snap.docs.filter(d => !d.data().night).map(d => ({ id: d.id, thumb: d.data().thumb || d.data().data, at: d.data().at || 0 })).sort((a, b) => a.at - b.at); renderPhotos(); }
     } catch (e) {}
   }
 }
@@ -1534,11 +1646,12 @@ async function saveTrip() {
       count++; if (thumbs.length < 4) thumbs.push({ id: pr.id, t: p.thumb });
     }
     delete S.photoCache[id];
-    const doc = { title, start: F.start, end: F.end || '', km: Math.max(0, parseFloat(String(F.km).replace(',', '.')) || 0), notes: F.notes.trim(), stops: F.stops, thumbs, photoCount: count,
+    const doc = { title, start: F.start, end: F.end || '', km: Math.max(0, parseFloat(String(F.km).replace(',', '.')) || 0), notes: F.notes.trim(), stops: F.stops, thumbs, photoCount: count, nights: old && old.nights ? old.nights : [],
       by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() };
     await ref.set(doc);
-    closeSheet(); toast(old ? 'Reis bijgewerkt' : 'Reis opgeslagen ✓');
+    closeSheet(); toast(old ? 'Reis bijgewerkt' : 'Reis opgeslagen ✓ Voeg nu de nachten toe');
     M.fitted = false; S.selTrip = null;
+    if (!old) { if (!S.trips.find(x => x.id === id)) S.trips.push(Object.assign({ id }, doc)); openDetail(id); }
   } catch (e) { F.saving = false; btn.disabled = false; btn.textContent = 'Opslaan'; dbFail(e); }
 }
 async function deleteTrip(id) {
@@ -1940,9 +2053,10 @@ document.addEventListener('click', e => {
   const act = a.dataset.act, id = a.dataset.id;
   if (act === 'scrim') { if (e.target === a) closeSheet(); return; }
   if (act === 'lightbox') {
-    const l = S.photoCache[id]; if (!l) return; const i = l.items.findIndex(x => x.id === a.dataset.p); if (i < 0) return;
-    openGallery(l.items, i); return;
+    const l = S.photoCache[id]; if (!l) return; const own = l.items.filter(x => !x.night), i = own.findIndex(x => x.id === a.dataset.p); if (i < 0) return;
+    openGallery(own, i); return;
   }
+  if (act === 'nlightbox') { openNightPhotos(a.dataset.t, a.dataset.n, a.dataset.p); return; }
   switch (act) {
     case 'tab': goTab(a.dataset.t); break;
     case 'close': closeSheet(); break;
@@ -1952,6 +2066,13 @@ document.addEventListener('click', e => {
     case 'detail': openDetail(id); break;
     case 'newtrip': openTripForm(null); break;
     case 'edittrip': openTripForm(id); break;
+    case 'newnight': openNightForm(id, null); break;
+    case 'editnight': openNightForm(id, a.dataset.n); break;
+    case 'nightmap': openPicker({ lat: S.F.lat, lon: S.F.lon, onPick: nightPick }); break;
+    case 'savenight': saveNight(); break;
+    case 'nightcancel': openDetail(id); break;
+    case 'delnight': openSheet('<h2>Zeker weten?</h2><p style="margin:0 0 4px">Deze nacht en de foto’s ervan worden verwijderd.</p><div class="actions"><button class="ghost" data-act="nightcancel" data-id="' + esc(id) + '">Annuleer</button><button class="danger" data-act="delnight2" data-id="' + esc(id) + '" data-n="' + esc(a.dataset.n) + '">Verwijder</button></div>', 'confirm'); break;
+    case 'delnight2': deleteNight(id, a.dataset.n); break;
     case 'deltrip': confirmSheet('Deze reis en al zijn foto’s worden definitief verwijderd.', 'Ja, verwijder', 'deltrip2', id); break;
     case 'deltrip2': deleteTrip(id); break;
     case 'savetrip': saveTrip(); break;
