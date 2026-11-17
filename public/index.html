@@ -304,6 +304,7 @@ details summary{color:var(--muted);cursor:pointer}
 .banner{margin:10px 16px 0;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--orange) 14%,transparent);border:1px solid color-mix(in srgb,var(--orange) 35%,transparent);font-size:13px}
 .roles{font-size:13px;color:var(--muted);background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:6px}
 .roles b{color:var(--ink)}
+a.tile{text-decoration:none;color:inherit}
 </style>
 </head>
 <body>
@@ -708,6 +709,7 @@ const ICONS = {
   map: '<svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>',
   timeline: '<svg viewBox="0 0 24 24"><path d="M6 3v18M6 6h12M6 12h8M6 18h11"/><circle cx="6" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/></svg>',
   spots: '<svg viewBox="0 0 24 24"><path d="M3 20 12 5l9 15z"/><path d="M12 5v15M9 20l3-6 3 6"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/></svg>',
   agenda: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>'
 };
 const full = () => S.canWrite !== false;
@@ -985,6 +987,7 @@ function homeView() {
   h += '<div class="tiles">' + tile('map', 'Kaart', places + (places === 1 ? ' plaats bezocht' : ' plaatsen bezocht')) + tile('timeline', 'Tijdlijn', n + (n === 1 ? ' reis' : ' reizen'));
   if (full()) h += tile('agenda', 'Agenda', S.newReqCount ? S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') : (nb ? 'Volgende: ' + fmtDate(nb.start) : 'Nog niets gepland'), S.newReqCount ? 'alert' : (isGuest() ? 'wide' : '')) + (isGuest() ? '' : tile('todo', 'To-do', open.length ? open.length + ' open' + (kapot ? ' · ' + kapot + ' kapot' : '') : 'Alles in orde', kapot ? 'alert' : ''));
   if (full()) h += tile('spots', 'Leuke spots', S.spots.length ? S.spots.length + (S.spots.length === 1 ? ' plek bewaard' : ' plekken bewaard') + (S.spots.some(s => s.fav) ? ' · ' + S.spots.filter(s => s.fav).length + ' ♥' : '') : 'Bewaar mooie overnachtingsplekken', 'wide');
+  h += '<a class="tile wide" href="info/">' + ICONS.info + '<div><b>Info over de camper</b><span class="s">Handleiding, checklists en noodnummers</span></div></a>';
   h += '</div>';
   if (writable()) h += '<div class="quick"><button class="primary" data-act="newtrip">+ Nieuwe reis toevoegen</button><div class="row2"><button class="ghost" data-act="newbooking">Camper reserveren</button>' + (isGuest() ? '' : '<button class="ghost" data-act="newtodo">To-do toevoegen</button>') + '</div><button class="ghost" data-act="copylink">Link voor klanten kopiëren</button></div>';
   else if (S.canWrite === false) h += '<div class="roles" style="margin-top:14px">Je hebt toegang tot de kaart en de tijdlijn.</div>';
