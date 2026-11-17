@@ -283,6 +283,13 @@ details summary{color:var(--muted);cursor:pointer}
 .sugs.vert{flex-direction:column;align-items:stretch;gap:4px}.sugs.vert button{text-align:left;border-radius:10px;padding:9px 12px;font-size:14px;background:var(--surface)}
 .linkbtn+.linkbtn{margin-top:8px}
 .picker{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column}
+.datebtn{width:100%;text-align:left;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;min-height:44px}
+.dpick{padding:16px calc(16px + env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px));padding-top:calc(16px + env(safe-area-inset-top,0px));overflow-y:auto}
+.dpick .dpin{max-width:420px;width:100%;margin:0 auto}
+.dpick .dstep{display:flex;gap:8px;margin:6px 0 12px}
+.dpick .dstep div{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
+.dpick .dstep div.on{border-color:var(--accent);color:var(--ink);box-shadow:0 0 0 1px var(--accent) inset}
+.dpick .dstep b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .pkbar{position:relative;display:flex;gap:8px;padding:10px;background:var(--surface);border-bottom:1px solid var(--line);z-index:3}
 .pkbar input{flex:1;min-width:0}.pkx{border:1px solid var(--line);background:var(--bg);border-radius:10px;width:42px;font-size:20px}
 .pksugs{position:absolute;left:10px;right:10px;top:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
@@ -1738,10 +1745,47 @@ function bookingHTML() {
   return '<h2>' + (F.id ? 'Boeking bewerken' : 'Camper reserveren / plannen') + '</h2>' +
     '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(KINDS).map(k => '<button style="--c:' + KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="kind" data-k="' + k + '">' + KINDS[k].label + '</button>').join('') + '</div></div>' +
     '<label><span class="lbl">Titel</span><input data-f="title" placeholder="' + (F.kind === 'onderhoud' ? 'bv. Keuring' : 'bv. Pinksteren naar de Ardennen') + '" value="' + esc(F.title) + '"></label>' +
-    '<div class="row2"><label><span class="lbl">Van</span><input type="date" data-f="start" value="' + esc(F.start) + '"></label><label><span class="lbl">Tot en met</span><input type="date" data-f="end" value="' + esc(F.end) + '"></label></div>' +
+    '<div class="row2"><div class="field"><span class="lbl">Van</span><button type="button" class="datebtn" data-act="bkrange" data-w="start">' + esc(fmtLong(F.start)) + '</button></div><div class="field"><span class="lbl">Tot en met</span><button type="button" class="datebtn" data-act="bkrange" data-w="end">' + esc(fmtLong(F.end)) + '</button></div></div>' +
     '<label><span class="lbl">Notitie</span><textarea data-f="notes" placeholder="Wie gaat mee, wat is de bedoeling…">' + esc(F.notes) + '</textarea></label>' +
     '<div id="conflict"></div>' +
     '<div class="actions">' + (F.id && !isGuest() ? '<button class="danger" data-act="delbooking" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
+}
+/* gezamenlijke datumkiezer voor 'Van' en 'Tot en met' */
+function openRangePop(which) {
+  const F = S.F; if (!F || $('.dpick')) return;
+  const base = new Date((which === 'end' ? F.end : F.start) + 'T00:00:00');
+  const P = { a: F.start, b: F.end, step: which, y: base.getFullYear(), m: base.getMonth() };
+  const el = document.createElement('div'); el.className = 'picker dpick'; pushStep();
+  document.body.appendChild(el);
+  const draw = () => {
+    const first = new Date(P.y, P.m, 1), off = (first.getDay() + 6) % 7, dim = new Date(P.y, P.m + 1, 0).getDate(), today = todayStr();
+    let cells = ''; for (let i = 0; i < off; i++) cells += '<span class="rd blank"></span>';
+    for (let d = 1; d <= dim; d++) {
+      const ds = ymd(new Date(P.y, P.m, d)), edge = ds === P.a || ds === P.b, mid = ds > P.a && ds < P.b;
+      cells += '<button type="button" class="rd' + (ds === today ? ' today' : '') + (edge ? ' sel' : '') + (mid ? ' mid' : '') + '" data-dp="' + ds + '" aria-label="' + esc(fmtLong(ds)) + '">' + d + '</button>';
+    }
+    el.innerHTML = '<div class="dpin"><h2 style="margin:0 0 4px">Kies de periode</h2>' +
+      '<div class="dstep"><div class="' + (P.step === 'start' ? 'on' : '') + '"><b>Van</b>' + esc(fmtLong(P.a)) + '</div><div class="' + (P.step === 'end' ? 'on' : '') + '"><b>Tot en met</b>' + esc(fmtLong(P.b)) + '</div></div>' +
+      '<div class="hint" style="margin-bottom:8px">' + (P.step === 'start' ? 'Tik op de eerste dag.' : 'Tik nu op de laatste dag.') + '</div>' +
+      '<div class="calhead"><button type="button" class="iconbtn" data-dp="prev" aria-label="Vorige maand">‹</button><h2>' + esc(first.toLocaleString('nl-BE', { month: 'long', year: 'numeric' })) + '</h2><button type="button" class="iconbtn" data-dp="next" aria-label="Volgende maand">›</button></div>' +
+      '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(x => '<span>' + x + '</span>').join('') + '</div><div class="grid rgrid">' + cells + '</div>' +
+      '<div class="actions" style="margin-top:14px"><button type="button" class="ghost" data-dp="cancel">Annuleer</button><button type="button" class="primary" data-dp="ok">Klaar</button></div></div>';
+  };
+  const apply = () => {
+    F.start = P.a; F.end = P.b; F.warned = false;
+    el.remove(); const sh = $('#sheet .sheet'); if (sh) { const sc = sh.scrollTop; sh.innerHTML = bookingHTML(); sh.scrollTop = sc; }
+  };
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-dp]'); if (!b) return; const v = b.dataset.dp;
+    if (v === 'prev') { P.m--; if (P.m < 0) { P.m = 11; P.y--; } draw(); }
+    else if (v === 'next') { P.m++; if (P.m > 11) { P.m = 0; P.y++; } draw(); }
+    else if (v === 'cancel') el.remove();
+    else if (v === 'ok') apply();
+    else if (P.step === 'start') { P.a = v; if (P.b < v) P.b = v; P.step = 'end'; draw(); }
+    else if (v < P.a) { P.a = v; draw(); }
+    else { P.b = v; apply(); }
+  });
+  draw();
 }
 function conflictsFor(F) {
   if (F.kind === 'plan') return [];
@@ -2145,6 +2189,7 @@ document.addEventListener('click', e => {
     case 'cprev': { S.cal.m--; if (S.cal.m < 0) { S.cal.m = 11; S.cal.y--; } renderView(); break; }
     case 'cnext': { S.cal.m++; if (S.cal.m > 11) { S.cal.m = 0; S.cal.y++; } renderView(); break; }
     case 'selday': S.cal.sel = a.dataset.d; { const d = new Date(a.dataset.d + 'T00:00:00'); S.cal.y = d.getFullYear(); S.cal.m = d.getMonth(); } renderView(); break;
+    case 'bkrange': openRangePop(a.dataset.w); break;
     case 'newbooking': openBookingForm(null); break;
     case 'editbooking': openBookingForm(id); break;
     case 'kind': S.F.kind = a.dataset.k; S.F.warned = false; { const sc = $('#sheet .sheet').scrollTop; $('#sheet .sheet').innerHTML = bookingHTML(); $('#sheet .sheet').scrollTop = sc; } break;
