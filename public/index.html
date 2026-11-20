@@ -430,6 +430,7 @@ function dbFail(e) {
 const isPhotoPath = p => /^(trips|spots)\/[^/]+\/photos(\/|$)/.test(p);
 const parentOf = p => p.replace(/\/[^/]+$/, '');
 const lastOf = p => p.split('/').pop();
+const okId = x => typeof x === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(x);
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 function mapErr(e) {
   const c = e && (e.code || e.status);
@@ -444,11 +445,11 @@ function makeDb(sb) {
     if (m) {
       const { data, error } = await sb.from('photos').select('id,data').eq('trip_id', m[1]);
       if (error) throw mapErr(error);
-      return (data || []).map(r => ({ id: r.id, data: r.data }));
+      return (data || []).filter(r => okId(r.id)).map(r => ({ id: r.id, data: r.data }));
     }
     const { data, error } = await sb.from('docs').select('path,data').eq('coll', coll);
     if (error) throw mapErr(error);
-    return (data || []).map(r => ({ id: lastOf(r.path), data: r.data }));
+    return (data || []).filter(r => okId(lastOf(r.path))).map(r => ({ id: lastOf(r.path), data: r.data }));
   }
   async function fetchDoc(path) {
     if (isPhotoPath(path)) {
@@ -461,7 +462,7 @@ function makeDb(sb) {
     return data ? data.data : undefined;
   }
   function dispatch(type, path, data) {
-    if (!path || isPhotoPath(path)) return;
+    if (!path || isPhotoPath(path) || !okId(lastOf(path))) return;
     const coll = parentOf(path);
     collSubs.forEach(s => { if (s.coll === coll) s.apply(type, lastOf(path), data); });
     docSubs.forEach(s => { if (s.path === path) s.apply(type, data); });
@@ -734,13 +735,15 @@ function render() { renderHeader(); renderView(); renderNav(); }
 function renderView() {
   if ((!full() && (S.tab === 'agenda' || S.tab === 'todo' || S.tab === 'spots')) || (isGuest() && S.tab === 'todo')) S.tab = 'home';
   renderFab();
-  const v = $('#view');
+  const v = $('#view'), oldSc = v.querySelector('.scroll'), keep = oldSc ? oldSc.scrollTop : 0, keepTab = v.dataset.tab;
   if (S.tab === 'home') v.innerHTML = homeView();
   else if (S.tab === 'map') { v.innerHTML = mapView(); initMap(); }
   else if (S.tab === 'timeline') v.innerHTML = timelineView();
   else if (S.tab === 'todo') v.innerHTML = todoView();
   else if (S.tab === 'spots') v.innerHTML = spotsView();
   else v.innerHTML = agendaView();
+  v.dataset.tab = S.tab;
+  if (keep && keepTab === S.tab) { const ns = v.querySelector('.scroll'); if (ns) ns.scrollTop = keep; }
 }
 
 /* ---------- landgrenzen, landnamen en steden ---------- */
@@ -940,7 +943,7 @@ function drawMap() {
     const P = st.map(s => proj(s.lon, s.lat));
     if (P.length > 1) lines += '<polyline points="' + P.map(p => p[0].toFixed(3) + ',' + p[1].toFixed(3)).join(' ') + '" fill="none" stroke="' + c + '" stroke-width="' + (sel ? 3.4 : 2.2) * px + '" stroke-dasharray="' + 7 * px + ' ' + 5 * px + '" stroke-linecap="round" opacity="' + (S.selTrip && !sel ? .35 : .9) + '"/>';
     P.forEach((p, i) => {
-      dots += '<g data-trip="' + t.id + '" style="cursor:pointer"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (sel ? 7.5 : 5.5) * px + '" fill="' + c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (S.selTrip && !sel ? .45 : 1) + '"/></g>';
+      dots += '<g data-trip="' + esc(t.id) + '" style="cursor:pointer"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (sel ? 7.5 : 5.5) * px + '" fill="' + c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (S.selTrip && !sel ? .45 : 1) + '"/></g>';
       if (sel || M.w < 22) labels += '<text x="' + (p[0] + 9 * px) + '" y="' + (p[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(st[i].name.replace(/\s*\(.*\)/, '')) + '</text>';
     });
   });
@@ -949,7 +952,7 @@ function drawMap() {
   let hearts = '', hlabels = '';
   favSpots().forEach(s => {
     const q = proj(s.lon, s.lat), sel = S.selSpot === s.id, r = (sel ? 11 : 9) * px;
-    hearts += '<g data-spot="' + s.id + '" style="cursor:pointer"><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + 17 * px + '" fill="transparent"/><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + r + '" fill="#c2453a" stroke="#fff" stroke-width="' + 2 * px + '"/><text x="' + q[0] + '" y="' + (q[1] + 4.2 * px) + '" font-size="' + (sel ? 13 : 11.5) * px + '" text-anchor="middle" fill="#fff" style="pointer-events:none;font-family:sans-serif">♥</text></g>';
+    hearts += '<g data-spot="' + esc(s.id) + '" style="cursor:pointer"><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + 17 * px + '" fill="transparent"/><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + r + '" fill="#c2453a" stroke="#fff" stroke-width="' + 2 * px + '"/><text x="' + q[0] + '" y="' + (q[1] + 4.2 * px) + '" font-size="' + (sel ? 13 : 11.5) * px + '" text-anchor="middle" fill="#fff" style="pointer-events:none;font-family:sans-serif">♥</text></g>';
     if (sel || M.w < 22) hlabels += '<text x="' + (q[0] + 13 * px) + '" y="' + (q[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(s.title) + '</text>';
   });
   const avoid = [];
@@ -967,10 +970,10 @@ function selectSpot(id) { S.selSpot = id; S.selTrip = null; drawMap(); drawCard(
 function drawCard() {
   const el = $('#mapcard'); if (!el) return;
   const sp = S.selSpot ? S.spots.find(x => x.id === S.selSpot) : null;
-  if (sp) { el.innerHTML = '<div class="mapcard"><h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + sp.id + '">Bekijk spot</button></div>'; return; }
+  if (sp) { el.innerHTML = '<div class="mapcard"><h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
   const t = S.trips.find(x => x.id === S.selTrip);
   if (!t) { el.innerHTML = ''; return; }
-  el.innerHTML = '<div class="mapcard"><h3>' + esc(t.title) + '</h3><div class="m">' + esc(fmtRange(t.start, t.end)) + (t.km ? ' · ' + fmtNum(t.km) + ' km' : '') + '</div><button class="small" data-act="detail" data-id="' + t.id + '">Bekijk reis</button></div>';
+  el.innerHTML = '<div class="mapcard"><h3>' + esc(t.title) + '</h3><div class="m">' + esc(fmtRange(t.start, t.end)) + (t.km ? ' · ' + fmtNum(t.km) + ' km' : '') + '</div><button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
 }
 
 /* ---------- start ---------- */
@@ -988,9 +991,9 @@ function homeView() {
     const d = diffDays(todayStr(), nb.start), when = d <= 0 ? 'Nu bezig' : d === 1 ? 'Morgen' : 'Over ' + d + ' dagen';
     h += '<button class="next" data-act="tab" data-t="agenda"><span class="k">' + when + ' · ' + esc((KINDS[nb.kind] || KINDS.plan).label) + '</span><h3>' + esc(nb.title) + '</h3><div class="m">' + esc(fmtRange(nb.start, nb.end)) + (nb.by ? ' · ' + esc(nameOf(nb.by)) : '') + '</div></button>';
   } else if (last) {
-    h += '<button class="next" data-act="detail" data-id="' + last.id + '"><span class="k">Laatste reis</span><h3>' + esc(last.title) + '</h3><div class="m">' + esc(fmtRange(last.start, last.end)) + (last.km ? ' · ' + fmtNum(last.km) + ' km' : '') + '</div></button>';
+    h += '<button class="next" data-act="detail" data-id="' + esc(last.id) + '"><span class="k">Laatste reis</span><h3>' + esc(last.title) + '</h3><div class="m">' + esc(fmtRange(last.start, last.end)) + (last.km ? ' · ' + fmtNum(last.km) + ' km' : '') + '</div></button>';
   }
-  const tile = (t, title, sub, cls) => '<button class="tile' + (cls ? ' ' + cls : '') + '" data-act="tab" data-t="' + t + '">' + ICONS[t] + '<div><b>' + title + '</b><span class="s">' + esc(sub) + '</span></div></button>';
+  const tile = (t, title, sub, cls) => '<button class="tile' + (cls ? ' ' + cls : '') + '" data-act="tab" data-t="' + esc(t) + '">' + ICONS[t] + '<div><b>' + title + '</b><span class="s">' + esc(sub) + '</span></div></button>';
   h += '<div class="tiles">' + tile('map', 'Kaart', places + (places === 1 ? ' plaats bezocht' : ' plaatsen bezocht')) + tile('timeline', 'Tijdlijn', n + (n === 1 ? ' reis' : ' reizen'));
   if (full()) h += tile('agenda', 'Agenda', S.newReqCount ? S.newReqCount + (S.newReqCount === 1 ? ' nieuwe aanvraag' : ' nieuwe aanvragen') : (nb ? 'Volgende: ' + fmtDate(nb.start) : 'Nog niets gepland'), S.newReqCount ? 'alert' : (isGuest() ? 'wide' : '')) + (isGuest() ? '' : tile('todo', 'To-do', open.length ? open.length + ' open' + (kapot ? ' · ' + kapot + ' kapot' : '') : 'Alles in orde', kapot ? 'alert' : ''));
   if (full()) h += tile('spots', 'Leuke spots', S.spots.length ? S.spots.length + (S.spots.length === 1 ? ' plek bewaard' : ' plekken bewaard') + (S.spots.some(s => s.fav) ? ' · ' + S.spots.filter(s => s.fav).length + ' ♥' : '') : 'Bewaar mooie overnachtingsplekken', 'wide');
@@ -1010,8 +1013,8 @@ const TODO_KINDS = {
 const PRIO = { hoog: { label: 'Dringend', rank: 0 }, normaal: { label: 'Normaal', rank: 1 }, laag: { label: 'Later', rank: 2 } };
 function todoItemHTML(t) {
   const k = TODO_KINDS[t.kind] || TODO_KINDS.kapot;
-  return '<div class="todo' + (t.done ? ' done' : '') + '"><button class="chk" data-act="ttoggle" data-id="' + t.id + '" aria-label="' + (t.done ? 'Terug openen' : 'Afvinken') + '"' + (writable() ? '' : ' disabled') + '><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>' +
-    '<button class="tbody" data-act="edittodo" data-id="' + t.id + '"><h4>' + esc(t.title) + '</h4><div class="m"><span class="tag" style="--c:' + k.color + '">' + k.label + '</span>' +
+  return '<div class="todo' + (t.done ? ' done' : '') + '"><button class="chk" data-act="ttoggle" data-id="' + esc(t.id) + '" aria-label="' + (t.done ? 'Terug openen' : 'Afvinken') + '"' + (writable() ? '' : ' disabled') + '><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>' +
+    '<button class="tbody" data-act="edittodo" data-id="' + esc(t.id) + '"><h4>' + esc(t.title) + '</h4><div class="m"><span class="tag" style="--c:' + k.color + '">' + k.label + '</span>' +
     (t.prio === 'hoog' && !t.done ? '<span class="tag" style="--c:var(--danger)">Dringend</span>' : '') + (t.prio === 'laag' && !t.done ? '<span>Later</span>' : '') +
     (t.price ? '<span>' + eur(t.price) + '</span>' : '') + (t.by ? '<span>' + esc(nameOf(t.by)) + '</span>' : '') + '</div>' + (t.notes ? '<div class="n">' + esc(t.notes) + '</div>' : '') + '</button></div>';
 }
@@ -1046,12 +1049,12 @@ function openTodoForm(id) {
 function todoFormHTML() {
   const F = S.F, K = TODO_KINDS[F.kind] || TODO_KINDS.kapot;
   return '<h2>' + (F.id ? 'Punt bewerken' : 'Nieuw to-do-punt') + '</h2>' +
-    '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(TODO_KINDS).map(k => '<button style="--c:' + TODO_KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="tkind" data-k="' + k + '">' + TODO_KINDS[k].label + '</button>').join('') + '</div></div>' +
+    '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(TODO_KINDS).map(k => '<button style="--c:' + TODO_KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="tkind" data-k="' + esc(k) + '">' + TODO_KINDS[k].label + '</button>').join('') + '</div></div>' +
     '<label><span class="lbl">Wat moet er gebeuren?</span><input id="todotitle" data-f="title" placeholder="' + esc(K.ph) + '" value="' + esc(F.title) + '"></label>' +
-    '<div class="field"><span class="lbl">Prioriteit</span><div class="kinds">' + Object.keys(PRIO).map(k => '<button style="--c:' + (k === 'hoog' ? 'var(--danger)' : 'var(--accent)') + '" class="' + (F.prio === k ? 'on' : '') + '" data-act="tprio" data-k="' + k + '">' + PRIO[k].label + '</button>').join('') + '</div></div>' +
+    '<div class="field"><span class="lbl">Prioriteit</span><div class="kinds">' + Object.keys(PRIO).map(k => '<button style="--c:' + (k === 'hoog' ? 'var(--danger)' : 'var(--accent)') + '" class="' + (F.prio === k ? 'on' : '') + '" data-act="tprio" data-k="' + esc(k) + '">' + PRIO[k].label + '</button>').join('') + '</div></div>' +
     '<label><span class="lbl">' + (F.kind === 'aankoop' ? 'Geschatte prijs (€)' : 'Geschatte kost (€, optioneel)') + '</span><input id="todoprice" type="number" inputmode="decimal" min="0" data-f="price" placeholder="0" value="' + esc(F.price) + '"></label>' +
     '<label><span class="lbl">Notitie</span><textarea id="todonotes" data-f="notes" placeholder="Waar zit het probleem, welk onderdeel, welke winkel…">' + esc(F.notes) + '</textarea></label>' +
-    '<div class="actions">' + (F.id ? '<button class="danger" data-act="deltodo" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savetodo">Opslaan</button></div>';
+    '<div class="actions">' + (F.id ? '<button class="danger" data-act="deltodo" data-id="' + esc(F.id) + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savetodo">Opslaan</button></div>';
 }
 async function saveTodo() {
   const F = S.F; if (!F || F.saving) return;
@@ -1082,7 +1085,7 @@ function timelineView() {
       const y = (t.start || '').slice(0, 4) || '—';
       if (y !== yr) { if (yr) html += '</div>'; html += '<div class="year">' + y + '</div><div class="tl">'; yr = y; }
       const n = nightsOf(t);
-      html += '<button class="tcard" data-act="detail" data-id="' + t.id + '" style="--c:' + tripColor(t) + '"><h3>' + esc(t.title) + '</h3><div class="tmeta">' + esc(fmtRange(t.start, t.end, true)) + (n ? ' · ' + n + (n === 1 ? ' nacht' : ' nachten') : '') + '</div><div class="pills">' +
+      html += '<button class="tcard" data-act="detail" data-id="' + esc(t.id) + '" style="--c:' + tripColor(t) + '"><h3>' + esc(t.title) + '</h3><div class="tmeta">' + esc(fmtRange(t.start, t.end, true)) + (n ? ' · ' + n + (n === 1 ? ' nacht' : ' nachten') : '') + '</div><div class="pills">' +
         (t.km ? '<span class="pill km">' + fmtNum(t.km) + ' km</span>' : '') + (t.stops || []).map(s => '<span class="pill">' + esc(s.name.replace(/\s*\(.*\)/, '')) + '</span>').join('') + '</div>' +
         ((t.thumbs || []).length ? '<div class="thumbrow">' + t.thumbs.map(p => '<img alt="" src="' + esc(p.t) + '">').join('') + '</div>' : '') + '</button>';
     });
@@ -1099,7 +1102,7 @@ function eventsOn(ds) {
   return ev;
 }
 function agendaView() {
-  if (S.reqTab === 'req') return requestsView();
+  if (S.reqTab === 'req' && !isGuest()) return requestsView();
   const { y, m } = S.cal, first = new Date(y, m, 1), off = (first.getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate();
   const title = first.toLocaleString('nl-BE', { month: 'long', year: 'numeric' });
   let cells = '';
@@ -1119,13 +1122,13 @@ function agendaView() {
 }
 function cellHTML(ds, d, out) {
   const ev = eventsOn(ds), bars = ev.slice(0, 3).map(e => '<div class="bar" style="--c:' + e.color + '"></div>').join('');
-  return '<button class="cell' + (out ? ' out' : '') + (ds === todayStr() ? ' today' : '') + (ds === S.cal.sel ? ' sel' : '') + '" data-act="selday" data-d="' + ds + '"><span class="dn">' + d + '</span>' + bars + (ev.length > 3 ? '<span class="more">+' + (ev.length - 3) + '</span>' : '') + '</button>';
+  return '<button class="cell' + (out ? ' out' : '') + (ds === todayStr() ? ' today' : '') + (ds === S.cal.sel ? ' sel' : '') + '" data-act="selday" data-d="' + esc(ds) + '"><span class="dn">' + d + '</span>' + bars + (ev.length > 3 ? '<span class="more">+' + (ev.length - 3) + '</span>' : '') + '</button>';
 }
 function evHTML(e) {
   const r = e.ref, isB = e.type === 'b';
   const sub = isB ? (KINDS[r.kind] || KINDS.plan).label : 'Gereden reis';
   const rng = isB ? fmtRange(r.start, r.end) : fmtRange(r.start, r.end);
-  return '<button class="ev" style="--c:' + e.color + '" data-act="' + (isB ? 'editbooking' : 'detail') + '" data-id="' + r.id + '"><div class="dot"></div><div style="flex:1;min-width:0"><h4>' + esc(e.title) + '</h4><div class="m">' + esc(sub) + ' · ' + esc(rng) + (r.by ? ' · ' + esc(nameOf(r.by)) : '') + '</div>' + (isB && r.notes ? '<div class="n">' + esc(r.notes) + '</div>' : '') + '</div></button>';
+  return '<button class="ev" style="--c:' + e.color + '" data-act="' + (isB ? 'editbooking' : 'detail') + '" data-id="' + esc(r.id) + '"><div class="dot"></div><div style="flex:1;min-width:0"><h4>' + esc(e.title) + '</h4><div class="m">' + esc(sub) + ' · ' + esc(rng) + (r.by ? ' · ' + esc(nameOf(r.by)) : '') + '</div>' + (isB && r.notes ? '<div class="n">' + esc(r.notes) + '</div>' : '') + '</div></button>';
 }
 
 /* ---------- sheets ---------- */
@@ -1133,6 +1136,16 @@ function openSheet(html, kind, id) {
   if (!$('#sheet .sheet')) pushStep();
   S.sheetKind = kind || ''; S.sheetId = id || null;
   $('#sheet').innerHTML = '<div class="scrim" data-act="scrim"><div class="sheet" role="dialog">' + html + '</div></div>';
+}
+/* ---------- niet per ongeluk een formulier sluiten ---------- */
+const FORMKINDS = ['form', 'nightform', 'spotform', 'todoform', 'booking'];
+const formDirty = () => !!(S.F && FORMKINDS.includes(S.sheetKind) && (S.F.dirty || (S.F.newPhotos && S.F.newPhotos.length) || S.TF));
+function guardClose(go) {
+  if (!formDirty() || $('.dgate')) { go(); return; }
+  const el = document.createElement('div'); el.className = 'scrim dgate'; el.style.zIndex = 120; el.style.alignItems = 'center';
+  el.innerHTML = '<div class="sheet" role="alertdialog" aria-modal="true" style="border-radius:16px;max-width:360px;margin:16px;max-height:none"><h2>Wijzigingen weggooien?</h2><p style="margin:0 0 4px">Wat je invulde wordt niet bewaard.</p><div class="actions"><button class="ghost" data-g="stay">Verder bewerken</button><button class="danger" data-g="go">Weggooien</button></div></div>';
+  el.addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (!g && e.target !== el) return; el.remove(); if (g && g.dataset.g === 'go') go(); });
+  document.body.appendChild(el);
 }
 function closeSheet() { S.sheetKind = ''; S.sheetId = null; S.F = null; $('#sheet').innerHTML = ''; }
 
@@ -1144,15 +1157,15 @@ function nightsHTML(t) {
   let h = '<div class="lbl" style="margin-top:14px">Tijdlijn per nacht</div>';
   if (!ns.length) h += '<div class="hint" style="margin-bottom:8px">' + (can ? 'Nog geen nachten. Voeg per nacht de plek toe, met foto’s en een opmerking.' : 'Nog geen nachten toegevoegd.') + '</div>';
   else h += '<div class="ntl">' + ns.map((n, i) => {
-    const th = (n.thumbs || []).map(x => '<img alt="" src="' + esc(x.t) + '" data-act="nlightbox" data-t="' + t.id + '" data-n="' + n.id + '" data-p="' + x.id + '">').join('');
-    const more = (n.photoCount || 0) > (n.thumbs || []).length ? '<div class="more" data-act="nlightbox" data-t="' + t.id + '" data-n="' + n.id + '" data-p="">+' + (n.photoCount - n.thumbs.length) + '</div>' : '';
+    const th = (n.thumbs || []).map(x => '<img alt="" src="' + esc(x.t) + '" data-act="nlightbox" data-t="' + esc(t.id) + '" data-n="' + esc(n.id) + '" data-p="' + esc(x.id) + '">').join('');
+    const more = (n.photoCount || 0) > (n.thumbs || []).length ? '<div class="more" data-act="nlightbox" data-t="' + esc(t.id) + '" data-n="' + esc(n.id) + '" data-p="">+' + (n.photoCount - n.thumbs.length) + '</div>' : '';
     return '<div class="tli"><span class="tld"></span><div class="tlb"><div class="tlh"><span class="tlk">Nacht ' + (i + 1) + (n.date ? ' · ' + esc(fmtDate(n.date)) : '') + '</span>' +
-      (can ? '<button class="tle" data-act="editnight" data-id="' + t.id + '" data-n="' + n.id + '">Bewerk</button>' : '') + '</div>' +
+      (can ? '<button class="tle" data-act="editnight" data-id="' + esc(t.id) + '" data-n="' + esc(n.id) + '">Bewerk</button>' : '') + '</div>' +
       '<h4>' + esc(n.name) + '</h4>' + (n.place && n.place !== n.name ? '<div class="m">📍 ' + esc(n.place) + '</div>' : '') +
       (n.notes ? '<div class="n">' + esc(n.notes) + '</div>' : '') + (th ? '<div class="dgrid">' + th + more + '</div>' : '') +
       (hasLoc(n) ? '<a class="tll" href="' + esc(spotLink(n)) + '" target="_blank" rel="noopener">Open in Google Maps</a>' : '') + '</div></div>';
   }).join('') + '</div>';
-  if (can) h += '<button class="locbtn" data-act="newnight" data-id="' + t.id + '" style="margin-bottom:6px"><span class="lt">＋ Nacht toevoegen</span><span class="ls">Plek, foto’s en commentaar van die nacht</span></button>';
+  if (can) h += '<button class="locbtn" data-act="newnight" data-id="' + esc(t.id) + '" style="margin-bottom:6px"><span class="lt">＋ Nacht toevoegen</span><span class="ls">Plek, foto’s en commentaar van die nacht</span></button>';
   return h;
 }
 async function loadPhotoList(kind, id) {
@@ -1191,7 +1204,7 @@ async function openNightForm(tid, nid, draft) {
     '<label><span class="lbl">Naam van de plek</span><input id="ntitle" data-f="title" placeholder="bv. Camping aan het meer" value="' + esc(S.F.title) + '"></label>' +
     '<label><span class="lbl">Commentaar</span><textarea data-f="notes" placeholder="Hoe was het? Uitzicht, prijs, tips, wat jullie deden…">' + esc(S.F.notes) + '</textarea></label>' +
     '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
-    '<div class="actions">' + (n && (draft || canDeleteItem(t)) ? '<button class="danger" data-act="delnight" data-id="' + esc(tid || '') + '" data-n="' + nid + '">Verwijder</button>' : '') + '<button class="ghost" data-act="nightcancel" data-id="' + esc(tid || '') + '">Annuleer</button><button class="primary" id="savebtn" data-act="savenight">' + (draft ? 'Klaar' : 'Opslaan') + '</button></div>', 'nightform', tid);
+    '<div class="actions">' + (n && (draft || canDeleteItem(t)) ? '<button class="danger" data-act="delnight" data-id="' + esc(tid || '') + '" data-n="' + esc(nid) + '">Verwijder</button>' : '') + '<button class="ghost" data-act="nightcancel" data-id="' + esc(tid || '') + '">Annuleer</button><button class="primary" id="savebtn" data-act="savenight">' + (draft ? 'Klaar' : 'Opslaan') + '</button></div>', 'nightform', tid);
   renderPhotos();
   if (n && n.photoCount && S.db && tid) {
     try {
@@ -1212,9 +1225,9 @@ async function commitNight(tid, n, onProgress) {
   const np = n.newPhotos || [];
   for (let i = 0; i < np.length; i++) {
     if (onProgress) onProgress(i + 1, np.length);
-    const pr = S.db.collection('trips/' + tid + '/photos').doc();
+    np[i].id = np[i].id || newId(); const pr = S.db.doc('trips/' + tid + '/photos/' + np[i].id);
     await pr.set({ data: np[i].full, thumb: np[i].thumb, at: Date.now() + i, by: S.me ? S.me.id : null, night: n.id });
-    count++; if (thumbs.length < 3) thumbs.push({ id: pr.id, t: np[i].thumb });
+    count++; if (thumbs.length < 3) thumbs.push({ id: np[i].id, t: np[i].thumb });
   }
   return { id: n.id, date: n.date, name: n.name, place: n.place, lat: n.lat, lon: n.lon, notes: n.notes, thumbs, photoCount: count, at: n.at };
 }
@@ -1270,7 +1283,7 @@ async function openDetail(id, soft) {
     (t.notes ? '<div class="notes">' + esc(t.notes) + '</div>' : '') +
     nightsHTML(t) +
     (t.photoCount ? '<div class="lbl">Foto’s van de reis</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
-    '<div class="actions">' + (canDeleteItem(t) ? '<button class="danger" data-act="deltrip" data-id="' + id + '">Verwijder</button>' : '') + (canEditItem(t) ? '<button class="ghost" data-act="edittrip" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
+    '<div class="actions">' + (canDeleteItem(t) ? '<button class="danger" data-act="deltrip" data-id="' + esc(id) + '">Verwijder</button>' : '') + (canEditItem(t) ? '<button class="ghost" data-act="edittrip" data-id="' + esc(id) + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
   openSheet(html, 'detail', id);
   if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
   if (t.photoCount && S.db) showPhotos('trips', id, tripPhotoTotal(t));
@@ -1284,7 +1297,7 @@ const spotOpen = s => hasLoc(s) || !s.link ? spotLink(s) : s.link;
 const spotRoute = s => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(s.lat + ',' + s.lon);
 function spotCardHTML(s) {
   const th = s.thumbs && s.thumbs[0] ? s.thumbs[0].t : '', pr = spotPrice(s);
-  return '<button class="spot" data-act="spot" data-id="' + s.id + '">' + (th ? '<img alt="" src="' + esc(th) + '">' : '<div class="noimg">⛺</div>') +
+  return '<button class="spot" data-act="spot" data-id="' + esc(s.id) + '">' + (th ? '<img alt="" src="' + esc(th) + '">' : '<div class="noimg">⛺</div>') +
     '<div class="sb"><h4>' + (s.fav ? '<span class="heart">♥</span> ' : '') + esc(s.title) + '</h4>' + (s.place ? '<div class="m">📍 ' + esc(s.place) + '</div>' : '') +
     (pr ? '<div class="m"><span class="pill km">' + esc(pr) + '</span></div>' : '') + (s.notes ? '<div class="n">' + esc(s.notes) + '</div>' : '') + '</div></button>';
 }
@@ -1306,7 +1319,7 @@ async function openSpot(id, soft) {
     (s.notes ? '<div class="notes">' + esc(s.notes) + '</div>' : '') +
     (s.photoCount ? '<div class="lbl">Foto’s</div><div class="dgrid" id="dphotos"><div class="hint">Laden…</div></div>' : '') +
     '<a class="linkbtn" href="' + esc(spotOpen(s)) + '" target="_blank" rel="noopener">Open in Google Maps</a>' + (hasLoc(s) ? '<a class="linkbtn" href="' + esc(spotRoute(s)) + '" target="_blank" rel="noopener">Route plannen</a>' : '') +
-    '<div class="actions">' + (canDeleteItem(s) ? '<button class="danger" data-act="delspot" data-id="' + id + '">Verwijder</button>' : '') + (canEditItem(s) ? '<button class="ghost" data-act="editspot" data-id="' + id + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
+    '<div class="actions">' + (canDeleteItem(s) ? '<button class="danger" data-act="delspot" data-id="' + esc(id) + '">Verwijder</button>' : '') + (canEditItem(s) ? '<button class="ghost" data-act="editspot" data-id="' + esc(id) + '">Bewerk</button>' : '') + '<button class="primary" data-act="close">Sluit</button></div>';
   openSheet(html, 'spot', id);
   if (soft && sc) { const sh = $('#sheet .sheet'); if (sh) sh.scrollTop = sc; }
   if (s.photoCount) showPhotos('spots', id, s.photoCount);
@@ -1321,7 +1334,7 @@ async function showPhotos(kind, id, count) {
       S.photoCache[id] = list;
     }
     const el = $('#dphotos');
-    if (el && S.sheetId === id) el.innerHTML = list.items.filter(p => !p.night).map(p => '<img alt="" src="' + esc(p.thumb || p.data) + '" data-act="lightbox" data-id="' + id + '" data-p="' + p.id + '">').join('');
+    if (el && S.sheetId === id) el.innerHTML = list.items.filter(p => !p.night).map(p => '<img alt="" src="' + esc(p.thumb || p.data) + '" data-act="lightbox" data-id="' + esc(id) + '" data-p="' + esc(p.id) + '">').join('');
   } catch (e) { const el = $('#dphotos'); if (el) el.innerHTML = '<div class="hint err">Foto’s laden is niet gelukt.</div>'; }
 }
 async function openSpotForm(id) {
@@ -1527,7 +1540,7 @@ function openPicker(O) {
     }
     const qq = q; if (qq.length < 3) return;
     const loc = matches(qq).slice(0, 3).map(p => ({ label: p.name, lat: p.lat, lon: p.lon }));
-    const show = list => { box.innerHTML = list.map((s, i) => '<button data-i="' + i + '">' + esc(s.label) + '</button>').join(''); box._list = list; };
+    const show = list => { box.innerHTML = list.map((s, i) => '<button data-i="' + esc(i) + '">' + esc(s.label) + '</button>').join(''); box._list = list; };
     show(loc);
     pt = setTimeout(async () => { try { const r = await searchPlaces(qq); if (seq === pseq) show(loc.concat(r).slice(0, 7)); } catch (x) { if (seq === pseq && !loc.length) box.innerHTML = '<div class="hint err">Zoeken lukt nu niet.</div>'; } }, 450);
   });
@@ -1551,14 +1564,14 @@ async function saveSpot() {
   try {
     const place = F.place.trim() || 'Gekozen locatie';
     const old = F.id ? S.spots.find(x => x.id === F.id) : null;
-    const ref = F.id ? S.db.doc('spots/' + F.id) : S.db.collection('spots').doc(), id = ref.id;
+    const ref = F.id ? S.db.doc('spots/' + F.id) : (F.newRef = F.newRef || S.db.collection('spots').doc()), id = ref.id;
     let thumbs = old && old.thumbs ? old.thumbs.slice() : [], count = old && old.photoCount ? old.photoCount : 0;
     for (const pid of Object.keys(F.remove)) { if (!F.remove[pid]) continue; await S.db.doc('spots/' + id + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
     for (let i = 0; i < F.newPhotos.length; i++) {
       btn.textContent = 'Foto ' + (i + 1) + '/' + F.newPhotos.length + '…';
-      const p = F.newPhotos[i], pr = S.db.collection('spots/' + id + '/photos').doc();
+      const p = F.newPhotos[i]; p.id = p.id || newId(); const pr = S.db.doc('spots/' + id + '/photos/' + p.id);
       await pr.set({ data: p.full, thumb: p.thumb, at: Date.now() + i, by: S.me ? S.me.id : null });
-      count++; if (thumbs.length < 4) thumbs.push({ id: pr.id, t: p.thumb });
+      count++; if (thumbs.length < 4) thumbs.push({ id: p.id, t: p.thumb });
     }
     delete S.photoCache[id];
     const pv = parseFloat(String(F.price).replace(',', '.'));
@@ -1630,11 +1643,11 @@ function renderNightsDraft() {
   const el = $('#nightsdraft'); if (!el || !S.F || !S.F.nights) return;
   const ns = S.F.nights.slice().sort(nightSort);
   el.innerHTML = ns.map((n, i) => '<div class="stoprow"><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(n.name) + '<small>' + esc(fmtDate(n.date)) + (n.place && n.place !== n.name ? ' · ' + esc(n.place) : '') + ' · ' + draftPhotoCount(n) + ' foto’s</small></div>' +
-    '<button data-act="draftedit" data-n="' + n.id + '" aria-label="Bewerk">✎</button><button data-act="draftdel" data-n="' + n.id + '" aria-label="Verwijder">✕</button></div>').join('');
+    '<button data-act="draftedit" data-n="' + esc(n.id) + '" aria-label="Bewerk">✎</button><button data-act="draftdel" data-n="' + esc(n.id) + '" aria-label="Verwijder">✕</button></div>').join('');
 }
 function renderStops() {
   const el = $('#stops'); if (!el || !S.F) return;
-  el.innerHTML = S.F.stops.map((s, i) => '<div class="stoprow" data-i="' + i + '"><span class="grip" data-grip aria-label="Sleep om de volgorde te wijzigen" title="Sleep om te verplaatsen">⠿</span><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(s.name) + '<small>' + s.lat.toFixed(3) + ', ' + s.lon.toFixed(3) + '</small></div><button data-act="stopdel" data-i="' + i + '" aria-label="Verwijder">✕</button></div>').join('');
+  el.innerHTML = S.F.stops.map((s, i) => '<div class="stoprow" data-i="' + esc(i) + '"><span class="grip" data-grip aria-label="Sleep om de volgorde te wijzigen" title="Sleep om te verplaatsen">⠿</span><span class="num">' + (i + 1) + '</span><div class="nm">' + esc(s.name) + '<small>' + s.lat.toFixed(3) + ', ' + s.lon.toFixed(3) + '</small></div><button data-act="stopdel" data-i="' + esc(i) + '" aria-label="Verwijder">✕</button></div>').join('');
 }
 function stopDrag(e) {
   const g = e.target.closest && e.target.closest('[data-grip]'); if (!g || !S.F) return;
@@ -1664,8 +1677,8 @@ function stopDrag(e) {
 document.addEventListener('pointerdown', stopDrag);
 function renderPhotos() {
   const el = $('#photos'); if (!el || !S.F) return;
-  const ex = S.F.existing.map(p => '<div class="ph' + (S.F.remove[p.id] ? ' gone' : '') + '"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phtoggle" data-id="' + p.id + '" aria-label="Verwijder foto">' + (S.F.remove[p.id] ? '↺' : '✕') + '</button></div>').join('');
-  const nw = S.F.newPhotos.map((p, i) => '<div class="ph"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phdel" data-i="' + i + '" aria-label="Verwijder foto">✕</button></div>').join('');
+  const ex = S.F.existing.map(p => '<div class="ph' + (S.F.remove[p.id] ? ' gone' : '') + '"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phtoggle" data-id="' + esc(p.id) + '" aria-label="Verwijder foto">' + (S.F.remove[p.id] ? '↺' : '✕') + '</button></div>').join('');
+  const nw = S.F.newPhotos.map((p, i) => '<div class="ph"><img alt="" src="' + esc(p.thumb) + '"><button data-act="phdel" data-i="' + esc(i) + '" aria-label="Verwijder foto">✕</button></div>').join('');
   el.innerHTML = ex + nw;
 }
 function stopMsg(msg, err) { const el = $('#stopmsg'); if (el) { el.textContent = msg || ''; el.className = 'hint' + (err ? ' err' : ''); } }
@@ -1696,15 +1709,15 @@ async function saveTrip() {
   F.saving = true; const btn = $('#savebtn'); btn.disabled = true; btn.textContent = 'Opslaan…';
   try {
     const old = F.id ? S.trips.find(x => x.id === F.id) : null;
-    const ref = F.id ? S.db.doc('trips/' + F.id) : S.db.collection('trips').doc();
+    const ref = F.id ? S.db.doc('trips/' + F.id) : (F.newRef = F.newRef || S.db.collection('trips').doc());
     const id = ref.id;
     let thumbs = old && old.thumbs ? old.thumbs.slice() : [], count = old && old.photoCount ? old.photoCount : 0;
     for (const pid of Object.keys(F.remove)) { if (!F.remove[pid]) continue; await S.db.doc('trips/' + id + '/photos/' + pid).delete(); count = Math.max(0, count - 1); thumbs = thumbs.filter(x => x.id !== pid); }
     for (let i = 0; i < F.newPhotos.length; i++) {
       btn.textContent = 'Foto ' + (i + 1) + '/' + F.newPhotos.length + '…';
-      const p = F.newPhotos[i], pr = S.db.collection('trips/' + id + '/photos').doc();
+      const p = F.newPhotos[i]; p.id = p.id || newId(); const pr = S.db.doc('trips/' + id + '/photos/' + p.id);
       await pr.set({ data: p.full, thumb: p.thumb, at: Date.now() + i, by: S.me ? S.me.id : null });
-      count++; if (thumbs.length < 4) thumbs.push({ id: pr.id, t: p.thumb });
+      count++; if (thumbs.length < 4) thumbs.push({ id: p.id, t: p.thumb });
     }
     delete S.photoCache[id];
     // slaapplaatsen: verwijderde nachten wissen, foto's van de overige wegschrijven
@@ -1743,12 +1756,12 @@ function openBookingForm(id, presetDate) {
 function bookingHTML() {
   const F = S.F;
   return '<h2>' + (F.id ? 'Boeking bewerken' : 'Camper reserveren / plannen') + '</h2>' +
-    '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(KINDS).map(k => '<button style="--c:' + KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="kind" data-k="' + k + '">' + KINDS[k].label + '</button>').join('') + '</div></div>' +
+    '<div class="field"><span class="lbl">Soort</span><div class="kinds">' + Object.keys(KINDS).map(k => '<button style="--c:' + KINDS[k].color + '" class="' + (F.kind === k ? 'on' : '') + '" data-act="kind" data-k="' + esc(k) + '">' + KINDS[k].label + '</button>').join('') + '</div></div>' +
     '<label><span class="lbl">Titel</span><input data-f="title" placeholder="' + (F.kind === 'onderhoud' ? 'bv. Keuring' : 'bv. Pinksteren naar de Ardennen') + '" value="' + esc(F.title) + '"></label>' +
     '<div class="row2"><div class="field"><span class="lbl">Van</span><button type="button" class="datebtn" data-act="bkrange" data-w="start">' + esc(fmtLong(F.start)) + '</button></div><div class="field"><span class="lbl">Tot en met</span><button type="button" class="datebtn" data-act="bkrange" data-w="end">' + esc(fmtLong(F.end)) + '</button></div></div>' +
     '<label><span class="lbl">Notitie</span><textarea data-f="notes" placeholder="Wie gaat mee, wat is de bedoeling…">' + esc(F.notes) + '</textarea></label>' +
     '<div id="conflict"></div>' +
-    '<div class="actions">' + (F.id && !isGuest() ? '<button class="danger" data-act="delbooking" data-id="' + F.id + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
+    '<div class="actions">' + (F.id ? '<button class="danger" data-act="delbooking" data-id="' + esc(F.id) + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
 }
 /* gezamenlijke datumkiezer voor 'Van' en 'Tot en met' */
 function openRangePop(which) {
@@ -1951,7 +1964,7 @@ function drawRcal() {
     const ds = ymd(new Date(R.y, R.m, d)), past = ds < today, busy = !past && isBusy(ds);
     const edge = ds === R.start || ds === R.end, mid = R.start && R.end && ds > R.start && ds < R.end;
     const cls = 'rd' + (past ? ' off' : '') + (busy ? ' busy' : '') + (ds === today ? ' today' : '') + (edge ? ' sel' : '') + (mid ? ' mid' : '');
-    cells += '<button type="button" class="' + cls + '" data-req="day" data-d="' + ds + '"' + (past || busy ? ' disabled' : '') + ' aria-label="' + esc(fmtLong(ds)) + (busy ? ', bezet' : '') + '"' + (edge ? ' aria-pressed="true"' : '') + '>' + d + '</button>';
+    cells += '<button type="button" class="' + cls + '" data-req="day" data-d="' + esc(ds) + '"' + (past || busy ? ' disabled' : '') + ' aria-label="' + esc(fmtLong(ds)) + (busy ? ', bezet' : '') + '"' + (edge ? ' aria-pressed="true"' : '') + '>' + d + '</button>';
   }
   el.innerHTML = '<div class="calhead"><button type="button" class="iconbtn" data-req="mprev" aria-label="Vorige maand"' + (shown <= cur ? ' disabled style="opacity:.35"' : '') + '>‹</button><h2>' + esc(title) + '</h2><button type="button" class="iconbtn" data-req="mnext" aria-label="Volgende maand"' + (shown >= cur + 18 ? ' disabled style="opacity:.35"' : '') + '>›</button></div>' +
     '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(d => '<span>' + d + '</span>').join('') + '</div><div class="grid rgrid">' + cells + '</div>' +
@@ -2044,7 +2057,7 @@ function copyLink() {
   try { navigator.clipboard.writeText(l).then(() => toast('Link gekopieerd ✓'), () => toast(l)); } catch (e) { toast(l); }
 }
 async function loadRequests() {
-  if (!S.sb || !S.canWrite) return;
+  if (!S.sb || !S.canWrite || isGuest()) return;
   try {
     const { data, error } = await S.sb.from('requests').select('*').order('created_at', { ascending: false });
     if (error || !data) return;
@@ -2065,6 +2078,7 @@ function startRequestLive() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) loadRequests(); });
 }
 function reqSeg() {
+  if (isGuest()) return '';
   return '<div class="seg"><button class="' + (S.reqTab !== 'req' ? 'on' : '') + '" data-act="reqtab" data-k="cal">Kalender</button><button class="' + (S.reqTab === 'req' ? 'on' : '') + '" data-act="reqtab" data-k="req">Aanvragen' + (S.newReqCount ? ' <b class="cnt">' + S.newReqCount + '</b>' : '') + '</button></div>';
 }
 const rqConflicts = r => S.bookings.filter(b => b.start <= r.end_date && r.start_date <= (b.end || b.start));
@@ -2078,8 +2092,8 @@ function rqHTML(r) {
     (r.note ? '<div class="n">' + esc(r.note) + '</div>' : '') +
     (cf.length ? '<div class="warn">Overlapt met: ' + cf.map(b => esc(b.title) + ' (' + esc(fmtRange(b.start, b.end)) + ')').join(', ') + '</div>' : '') +
     '<div class="m">Ingediend op ' + esc(fmtDate(r.created_at, true)) + '</div>' +
-    (isGuest() ? '' : isNew ? '<div class="actions"><button class="danger" data-act="rqreject" data-id="' + id + '">Afwijzen</button><button class="primary" data-act="rqapprove" data-id="' + id + '">Goedkeuren</button></div>'
-      : '<div class="actions"><button class="ghost" data-act="rqdel" data-id="' + id + '">Verwijder gegevens</button></div>') + '</div>';
+    (isGuest() ? '' : isNew ? '<div class="actions"><button class="danger" data-act="rqreject" data-id="' + esc(id) + '">Afwijzen</button><button class="primary" data-act="rqapprove" data-id="' + esc(id) + '">Goedkeuren</button></div>'
+      : '<div class="actions"><button class="ghost" data-act="rqdel" data-id="' + esc(id) + '">Verwijder gegevens</button></div>') + '</div>';
 }
 function requestsView() {
   const nw = S.requests.filter(r => r.status === 'new'), done = S.requests.filter(r => r.status !== 'new');
@@ -2136,7 +2150,7 @@ document.addEventListener('click', e => {
 /* ---------- events ---------- */
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset && t.dataset.f && S.F) S.F[t.dataset.f] = t.value;
+  if (t.dataset && t.dataset.f && S.F) { S.F[t.dataset.f] = t.value; S.F.dirty = true; }
 });
 document.addEventListener('change', async e => {
   if (e.target.id !== 'photoin' || !S.F) return;
@@ -2149,11 +2163,11 @@ document.addEventListener('change', async e => {
   if (msg) msg.textContent = ''; renderPhotos();
 });
 document.addEventListener('keydown', e => { const lb = $('.lightbox'); if (lb && lb._go && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { lb._go(e.key === 'ArrowLeft' ? -1 : 1); return; }
-  if (e.key === 'Escape') { if ($('.picker')) { $('.picker').remove(); return; } if ($('.lightbox')) $('.lightbox').remove(); else if (S.sheetKind) closeSheet(); } });
+  if (e.key === 'Escape') { if ($('.dgate')) { $('.dgate').remove(); return; } if ($('.picker')) { $('.picker').remove(); return; } if ($('.lightbox')) $('.lightbox').remove(); else if (S.sheetKind) guardClose(closeSheet); } });
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act, id = a.dataset.id;
-  if (act === 'scrim') { if (e.target === a) closeSheet(); return; }
+  if (act === 'scrim') { if (e.target === a) guardClose(closeSheet); return; }
   if (act === 'lightbox') {
     const l = S.photoCache[id]; if (!l) return; const own = l.items.filter(x => !x.night), i = own.findIndex(x => x.id === a.dataset.p); if (i < 0) return;
     openGallery(own, i); return;
@@ -2240,8 +2254,10 @@ function goTab(t, fromBack) {
 function handleBack() {
   const lb = $('.lightbox'); if (lb) { lb.remove(); return true; }
   const pk = $('.picker'); if (pk) { pk.remove(); return true; }
+  if ($('.dgate')) { $('.dgate').remove(); return true; }
   if (S.F && S.F.draft && S.TF && $('#sheet .sheet')) { S.F = S.TF; S.TF = null; showTripForm(); return true; }
-  if ($('#sheet .sheet')) { closeSheet(); return true; }
+  if (S.sheetKind === 'nightform' && S.F && S.F.tid && !S.F.draft && $('#sheet .sheet')) { const tid = S.F.tid; guardClose(() => openDetail(tid)); return true; }
+  if ($('#sheet .sheet')) { guardClose(closeSheet); return true; }
   if ($('#reqform')) { closeRequest(); return true; }
   if (S.db && S.tabHist.length) { goTab(S.tabHist.pop(), true); return true; }
   if (S.db && S.tab !== 'home') { goTab('home', true); return true; }

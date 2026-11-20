@@ -22,3 +22,5 @@ Gratis telefoon-app (PWA) voor een gedeelde camper: reizen (km, foto's, nachten/
 - Bij wijzigingen aan `index.html`: CSS-klasse `.tl` is al in gebruik (tijdlijn-tab); nachten gebruiken `.ntl`.
 - De gebruiker bewerkt de handleiding soms lokaal op zijn pc (`C:\Users\sebas\Downloads\camper-danny-app`). Vergelijk dan eerst met `public/` voor je iets overschrijft: `index.html` in die map kan ouder zijn dan die in de repo.
 - Hou `/mnt/user-data/outputs/camper-danny-site/index.html` niet als bron aan in een nieuw gesprek: de repo is de bron.
+- Beveiliging: ids/paden mogen enkel `A-Za-z0-9_-` bevatten (check-constraints in de database + `okId()` in de app); gebruik `esc()` bij elke waarde in een HTML-attribuut. `public/_headers` bevat de CSP: voeg een nieuwe externe host daar ook toe, anders wordt hij geblokkeerd.
+- Gasten zien geen huuraanvragen en mogen alleen hun eigen boekingen verwijderen (zie `supabase/camper-danny-update-beveiliging.sql`, al toegepast).
