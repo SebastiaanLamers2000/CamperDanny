@@ -75,7 +75,8 @@ nav button.on{color:var(--accent);font-weight:600}
 .chip b{color:var(--accent)}
 .mapctl{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
 .mapctl button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
-.mapcard{position:absolute;left:12px;bottom:14px;right:96px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;box-shadow:var(--shadow)}
+.mapcard{position:absolute;left:12px;bottom:84px;right:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;box-shadow:var(--shadow)}
+.mcimg{display:block;width:100%;height:108px;object-fit:cover;border-radius:10px;margin-bottom:8px}
 .mapcard h3{font-size:16px}
 .mapcard .m{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .mapnote{position:absolute;left:12px;bottom:6px;font-size:10.5px;color:var(--muted);opacity:.9;pointer-events:none}
@@ -871,6 +872,14 @@ function mapLabels(vb, px, avoid) {
 /* ---------- kaart ---------- */
 const M = { cx: 8 * K, cy: -50, w: 40 * K, fitted: false };
 const favSpots = () => S.spots.filter(s => s.fav && hasLoc(s));
+const LBL_SKIP = new Set(['camping', 'campingplatz', 'camperplaats', 'camperplatz', 'stellplatz', 'wohnmobilstellplatz', 'wohnmobilplatz', 'parkplatz', 'parking', 'aire', 'area', 'hotel', 'restaurant', 'de', 'het', 'een', 'la', 'le', 'les', 'el', 'der', 'die', 'das', 'l', 'the', 'bij', 'aan', 'at', 'in', 'von', 'am', 'im', 'overnachting']);
+// kort label voor op de kaart: één woord (de eigen naam of de plaatsnaam), zonder 'Camping', 'Stellplatz', …
+function shortName(name) {
+  const n = String(name || '').replace(/\s*\(.*?\)/g, '').split(/[,;–—|]| - /)[0].trim(), w = n.split(/\s+/).filter(Boolean);
+  const k = w.find(x => !LBL_SKIP.has(x.toLowerCase().replace(/[.']/g, ''))) || w[0] || '';
+  const r = k.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  return r.length > 16 ? r.slice(0, 15) + '…' : r;
+}
 function mapTrips() { return S.mapYear ? S.trips.filter(t => (t.start || '').slice(0, 4) === S.mapYear) : S.trips; }
 function mapStops() { const a = []; mapTrips().forEach(t => (t.stops || []).forEach(s => a.push(s))); return a; }
 function allStops() { const a = []; S.trips.forEach(t => (t.stops || []).forEach(s => a.push(s))); return a; }
@@ -966,7 +975,7 @@ function initMap() {
   };
   const up = e => {
     if (!ptrs.has(e.pointerId)) return;
-    if (ptrs.size === 1 && !moved) { if (downT && downT.dataset.cl != null) zoomCluster(+downT.dataset.cl); else if (downT) { if (downT.dataset.spot) selectSpot(downT.dataset.spot); else selectTrip(downT.dataset.trip); } else if (S.selTrip || S.selSpot) { S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); } }
+    if (ptrs.size === 1 && !moved) { if (downT && downT.dataset.cl != null) zoomCluster(+downT.dataset.cl); else if (downT) { if (downT.dataset.spot) selectSpot(downT.dataset.spot); else selectTrip(downT.dataset.trip, downT.dataset.stop); } else if (S.selTrip || S.selSpot) { S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); } }
     ptrs.delete(e.pointerId); lastDist = 0;
   };
   wrap.onpointerup = up; wrap.onpointercancel = up;
@@ -1032,7 +1041,7 @@ function drawMap() {
         if (vis) wantRoute(st[i - 1], st[i], sel);
       }
     }
-    P.forEach((q, i) => dots.push({ x: q[0], y: q[1], sx: (q[0] - vb[0]) / px, sy: (q[1] - vb[1]) / px, t, c, sel, name: st[i].name, faded }));
+    P.forEach((q, i) => dots.push({ x: q[0], y: q[1], sx: (q[0] - vb[0]) / px, sy: (q[1] - vb[1]) / px, t, c, sel, name: st[i].name, i, faded }));
   });
   // dichtbij elkaar liggende stippen samenvoegen tot één bol met aantal
   const singles = [], cells = new Map(); M.cl = [];
@@ -1049,8 +1058,8 @@ function drawMap() {
     clH += '<g data-cl="' + i + '" style="cursor:pointer"><circle cx="' + mx + '" cy="' + my + '" r="' + (r + 6 * px) + '" fill="transparent"/><circle cx="' + mx + '" cy="' + my + '" r="' + r + '" fill="#1d6b64" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (allFaded ? .45 : .95) + '"/><text x="' + mx + '" y="' + (my + 4.5 * px) + '" font-size="' + 12.5 * px + '" font-weight="700" text-anchor="middle" fill="#fff" style="pointer-events:none;font-family:sans-serif">' + a.length + '</text></g>';
   });
   singles.forEach(d => {
-    dotsH += '<g data-trip="' + esc(d.t.id) + '" style="cursor:pointer"><circle cx="' + d.x + '" cy="' + d.y + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + d.x + '" cy="' + d.y + '" r="' + (d.sel ? 7.5 : 5.5) * px + '" fill="' + d.c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (d.faded ? .45 : 1) + '"/></g>';
-    if (d.sel || M.w < 22) labels += '<text x="' + (d.x + 9 * px) + '" y="' + (d.y + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(String(d.name).replace(/\s*\(.*\)/, '')) + '</text>';
+    dotsH += '<g data-trip="' + esc(d.t.id) + '" data-stop="' + d.i + '" style="cursor:pointer"><circle cx="' + d.x + '" cy="' + d.y + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + d.x + '" cy="' + d.y + '" r="' + (d.sel ? 7.5 : 5.5) * px + '" fill="' + d.c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (d.faded ? .45 : 1) + '"/></g>';
+    if (d.sel || M.w < 22) labels += '<text x="' + (d.x + 9 * px) + '" y="' + (d.y + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(shortName(d.name)) + '</text>';
   });
   let van = '';
   if (latest && (!S.mapYear || trips.includes(latest))) { const st = latest.stops.filter(x => isFinite(x.lat) && isFinite(x.lon)); const l = st[st.length - 1]; if (l) { const q = proj(l.lon, l.lat); van = '<text x="' + q[0] + '" y="' + (q[1] - 10 * px) + '" font-size="' + 20 * px + '" text-anchor="middle" style="pointer-events:none">🚐</text>'; } }
@@ -1058,23 +1067,31 @@ function drawMap() {
   favSpots().forEach(s => {
     const q = proj(s.lon, s.lat), sel = S.selSpot === s.id, r = (sel ? 11 : 9) * px;
     hearts += '<g data-spot="' + esc(s.id) + '" style="cursor:pointer"><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + 17 * px + '" fill="transparent"/><circle cx="' + q[0] + '" cy="' + q[1] + '" r="' + r + '" fill="#c2453a" stroke="#fff" stroke-width="' + 2 * px + '"/><text x="' + q[0] + '" y="' + (q[1] + 4.2 * px) + '" font-size="' + (sel ? 13 : 11.5) * px + '" text-anchor="middle" fill="#fff" style="pointer-events:none;font-family:sans-serif">♥</text></g>';
-    if (sel || M.w < 22) hlabels += '<text x="' + (q[0] + 13 * px) + '" y="' + (q[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(s.title) + '</text>';
+    if (sel || M.w < 22) hlabels += '<text x="' + (q[0] + 13 * px) + '" y="' + (q[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(shortName(s.title)) + '</text>';
   });
   const avoid = [];
-  singles.forEach(d => { avoid.push([d.sx - 9, d.sy - 22, 18, 31]); if (d.sel || M.w < 22) avoid.push([d.sx + 6, d.sy - 9, String(d.name).replace(/\s*\(.*\)/, '').length * 6.6 + 8, 18]); });
+  singles.forEach(d => { avoid.push([d.sx - 9, d.sy - 22, 18, 31]); if (d.sel || M.w < 22) avoid.push([d.sx + 6, d.sy - 9, shortName(d.name).length * 6.6 + 8, 18]); });
   M.cl.forEach(c => { const x = (c.x - vb[0]) / px, y = (c.y - vb[1]) / px; avoid.push([x - c.r - 2, y - c.r - 2, 2 * c.r + 4, 2 * c.r + 4]); });
-  favSpots().forEach(s => { const q = proj(s.lon, s.lat), x = (q[0] - vb[0]) / px, y = (q[1] - vb[1]) / px; avoid.push([x - 11, y - 11, 22, 22]); if (S.selSpot === s.id || M.w < 22) avoid.push([x + 10, y - 9, String(s.title).length * 6.6 + 8, 18]); });
+  favSpots().forEach(s => { const q = proj(s.lon, s.lat), x = (q[0] - vb[0]) / px, y = (q[1] - vb[1]) / px; avoid.push([x - 11, y - 11, 22, 22]); if (S.selSpot === s.id || M.w < 22) avoid.push([x + 10, y - 9, shortName(s.title).length * 6.6 + 8, 18]); });
   const lab = $('#lab'); if (lab) lab.innerHTML = mapLabels(vb, px, avoid);
   $('#marks').innerHTML = lines + dotsH + clH + hearts + labels + hlabels + van;
 }
-function selectTrip(id) { S.selTrip = id; S.selSpot = null; drawMap(); drawCard(); }
-function selectSpot(id) { S.selSpot = id; S.selTrip = null; drawMap(); drawCard(); }
+function selectTrip(id, stop) { S.selTrip = id; S.selStop = stop != null && stop !== '' ? +stop : null; S.selSpot = null; drawMap(); drawCard(); }
+function selectSpot(id) { S.selSpot = id; S.selTrip = null; S.selStop = null; drawMap(); drawCard(); }
 function drawCard() {
   const el = $('#mapcard'); if (!el) return;
   const sp = S.selSpot ? S.spots.find(x => x.id === S.selSpot) : null;
-  if (sp) { el.innerHTML = '<div class="mapcard"><h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
+  const img = th => th ? '<img class="mcimg" alt="" src="' + esc(th) + '">' : '';
+  if (sp) { el.innerHTML = '<div class="mapcard">' + img(sp.thumbs && sp.thumbs[0] && sp.thumbs[0].t) + '<h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
   const t = S.trips.find(x => x.id === S.selTrip);
   if (!t) { el.innerHTML = ''; return; }
+  const st = (t.stops || []).filter(x => isFinite(x.lat) && isFinite(x.lon)), stop = S.selStop != null ? st[S.selStop] : null;
+  if (stop) {
+    const nt = stop.night ? (t.nights || []).find(x => x.id === stop.night) : null, note = nt && nt.notes ? nt.notes.trim() : '';
+    el.innerHTML = '<div class="mapcard">' + img(nt && nt.thumbs && nt.thumbs[0] && nt.thumbs[0].t) + '<h3>' + esc(nt ? nt.name : String(stop.name).replace(/\s*\(.*\)/, '')) + '</h3><div class="m">' + esc([nt && nt.date ? fmtLong(nt.date) : '', t.title].filter(Boolean).join(' · ')) + '</div>' +
+      (note ? '<div class="m" style="color:var(--ink)">' + esc(note.length > 90 ? note.slice(0, 88) + '…' : note) + '</div>' : '') + '<button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
+    return;
+  }
   el.innerHTML = '<div class="mapcard"><h3>' + esc(t.title) + '</h3><div class="m">' + esc(fmtRange(t.start, t.end)) + (t.km ? ' · ' + fmtNum(t.km) + ' km' : '') + '</div><button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
 }
 
@@ -1742,7 +1759,7 @@ async function openTripForm(id) {
   S.F = { id: id || null, title: t ? t.title : '', start: t ? t.start || '' : '', end: t ? t.end || '' : '', km: t && t.km ? String(t.km) : '', notes: t ? t.notes || '' : '',
     stops: t ? (t.stops || []).filter(s => !s.night).map(s => Object.assign({}, s)) : [], nights: t ? (t.nights || []).map(n => Object.assign({}, n, { newPhotos: [], remove: {} })) : [], delNights: [],
     newPhotos: [], existing: [], remove: {}, saving: false };
-  if (!t) { const d = new Date(); d.setMinutes(0, 0, 0); S.F.start = ymd(d) + 'T' + pad(d.getHours()) + ':00'; }
+  if (!t) S.F.start = todayStr();
   showTripForm();
   if (t && t.photoCount && S.db) {
     try {
@@ -1755,7 +1772,7 @@ function showTripForm() {
   const F = S.F, t = F.id ? S.trips.find(x => x.id === F.id) : null;
   const html = '<h2>' + (t ? 'Reis bewerken' : 'Reis vastleggen') + '</h2>' +
     '<label><span class="lbl">Titel</span><input data-f="title" placeholder="bv. Weekend Ardennen" value="' + esc(F.title) + '"></label>' +
-    '<div class="row2"><label><span class="lbl">Vertrek</span><input type="datetime-local" data-f="start" value="' + esc(F.start) + '"></label><label><span class="lbl">Terug</span><input type="datetime-local" data-f="end" value="' + esc(F.end) + '"></label></div>' +
+    '<div class="row2"><div class="field"><span class="lbl">Vertrek</span><button type="button" class="datebtn" data-act="trange" data-w="start">' + esc(F.start ? fmtLong(dayOf(F.start)) : 'Kies een datum') + '</button></div><div class="field"><span class="lbl">Terug</span><button type="button" class="datebtn" data-act="trange" data-w="end">' + esc(F.end ? fmtLong(dayOf(F.end)) : 'Kies een datum') + '</button></div></div>' +
     '<label><span class="lbl">Gereden kilometers</span><input type="number" inputmode="decimal" min="0" data-f="km" placeholder="bv. 412" value="' + esc(F.km) + '"></label>' +
     '<div class="field"><span class="lbl">Slaapplaatsen (per nacht)</span><div id="nightsdraft"></div>' +
     '<button class="locbtn" data-act="draftnight"><span class="lt">＋ Slaapplaats toevoegen</span><span class="ls">Locatie op de kaart, foto’s en commentaar. Herhaal dit voor elke nacht.</span></button></div>' +
@@ -1833,7 +1850,7 @@ async function saveTrip() {
   const F = S.F; if (!F || F.saving) return;
   const title = F.title.trim(); if (!title) { toast('Geef de reis een titel.'); return; }
   if (!F.start) { toast('Vul een vertrekdatum in.'); return; }
-  if (F.end && F.end < F.start) { toast('“Terug” ligt voor “Vertrek”.'); return; }
+  if (F.end && dayOf(F.end) < dayOf(F.start)) { toast('“Terug” ligt voor “Vertrek”.'); return; }
   F.saving = true; const btn = $('#savebtn'); btn.disabled = true; btn.textContent = 'Opslaan…';
   try {
     const old = F.id ? S.trips.find(x => x.id === F.id) : null;
@@ -1899,29 +1916,36 @@ function bookingHTML() {
     '<div class="actions">' + (F.id ? '<button class="danger" data-act="delbooking" data-id="' + esc(F.id) + '">Verwijder</button>' : '<button class="ghost" data-act="close">Annuleer</button>') + '<button class="primary" id="savebtn" data-act="savebooking">Opslaan</button></div>';
 }
 /* gezamenlijke datumkiezer voor 'Van' en 'Tot en met' */
-function openRangePop(which) {
+function openRangePop(which, trip) {
   const F = S.F; if (!F || $('.dpick')) return;
-  const base = new Date((which === 'end' ? F.end : F.start) + 'T00:00:00');
-  const P = { a: F.start, b: F.end, step: which, y: base.getFullYear(), m: base.getMonth() };
+  const a0 = trip ? (dayOf(F.start) || todayStr()) : F.start, b0 = trip ? (dayOf(F.end) || a0) : F.end;
+  const base = new Date((which === 'end' ? b0 : a0) + 'T00:00:00');
+  const P = { a: a0, b: b0, step: which, y: base.getFullYear(), m: base.getMonth() };
+  const L = trip ? ['Vertrek', 'Terug'] : ['Van', 'Tot en met'], cf = (st, en) => trip ? [] : conflictsFor({ id: F.id, kind: F.kind, start: st, end: en });
   const el = document.createElement('div'); el.className = 'picker dpick'; pushStep();
   document.body.appendChild(el);
   const draw = () => {
     const first = new Date(P.y, P.m, 1), off = (first.getDay() + 6) % 7, dim = new Date(P.y, P.m + 1, 0).getDate(), today = todayStr();
     let cells = ''; for (let i = 0; i < off; i++) cells += '<span class="rd blank"></span>';
     for (let d = 1; d <= dim; d++) {
-      const ds = ymd(new Date(P.y, P.m, d)), edge = ds === P.a || ds === P.b, mid = ds > P.a && ds < P.b, bz = conflictsFor({ id: F.id, kind: F.kind, start: ds, end: ds }).length > 0;
+      const ds = ymd(new Date(P.y, P.m, d)), edge = ds === P.a || ds === P.b, mid = ds > P.a && ds < P.b, bz = cf(ds, ds).length > 0;
       cells += '<button type="button" class="rd' + (ds === today ? ' today' : '') + (edge ? ' sel' : '') + (mid ? ' mid' : '') + (bz ? ' busyd' : '') + '" data-dp="' + ds + '" aria-label="' + esc(fmtLong(ds)) + '">' + d + '</button>';
     }
     el.innerHTML = '<div class="dpin"><h2 style="margin:0 0 4px">Kies de periode</h2>' +
-      '<div class="dstep"><div class="' + (P.step === 'start' ? 'on' : '') + '"><b>Van</b>' + esc(fmtLong(P.a)) + '</div><div class="' + (P.step === 'end' ? 'on' : '') + '"><b>Tot en met</b>' + esc(fmtLong(P.b)) + '</div></div>' +
-      '<div class="hint" style="margin-bottom:8px">' + (P.step === 'start' ? 'Tik op de eerste dag.' : 'Tik nu op de laatste dag.') + ' Dagen met een streepje zijn al bezet.</div>' + (conflictsFor({ id: F.id, kind: F.kind, start: P.a, end: P.b }).length ? '<div class="hint err" style="margin-bottom:8px">Let op: deze periode overlapt met ' + esc(conflictsFor({ id: F.id, kind: F.kind, start: P.a, end: P.b }).map(x => x.title).join(', ')) + '.</div>' : '') +
+      '<div class="dstep"><div class="' + (P.step === 'start' ? 'on' : '') + '"><b>' + L[0] + '</b>' + esc(fmtLong(P.a)) + '</div><div class="' + (P.step === 'end' ? 'on' : '') + '"><b>' + L[1] + '</b>' + esc(fmtLong(P.b)) + '</div></div>' +
+      '<div class="hint" style="margin-bottom:8px">' + (P.step === 'start' ? 'Tik op de eerste dag.' : 'Tik nu op de laatste dag.') + (trip ? '' : ' Dagen met een streepje zijn al bezet.') + '</div>' + (cf(P.a, P.b).length ? '<div class="hint err" style="margin-bottom:8px">Let op: deze periode overlapt met ' + esc(cf(P.a, P.b).map(x => x.title).join(', ')) + '.</div>' : '') +
       '<div class="calhead"><button type="button" class="iconbtn" data-dp="prev" aria-label="Vorige maand">‹</button><h2>' + esc(first.toLocaleString('nl-BE', { month: 'long', year: 'numeric' })) + '</h2><button type="button" class="iconbtn" data-dp="next" aria-label="Volgende maand">›</button></div>' +
       '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(x => '<span>' + x + '</span>').join('') + '</div><div class="grid rgrid">' + cells + '</div>' +
       '<div class="actions" style="margin-top:14px"><button type="button" class="ghost" data-dp="cancel">Annuleer</button><button type="button" class="primary" data-dp="ok">Klaar</button></div></div>';
   };
   const apply = () => {
+    el.remove(); const sh = $('#sheet .sheet'), sc = sh ? sh.scrollTop : 0;
+    if (trip) {
+      if (dayOf(F.start) !== P.a) F.start = P.a; if (dayOf(F.end) !== P.b) F.end = P.b; F.dirty = true;
+      showTripForm(); const sh2 = $('#sheet .sheet'); if (sh2) sh2.scrollTop = sc; return;
+    }
     F.start = P.a; F.end = P.b; F.warned = false;
-    el.remove(); const sh = $('#sheet .sheet'); if (sh) { const sc = sh.scrollTop; sh.innerHTML = bookingHTML(); sh.scrollTop = sc; }
+    if (sh) { sh.innerHTML = bookingHTML(); sh.scrollTop = sc; }
   };
   el.addEventListener('click', e => {
     const b = e.target.closest('[data-dp]'); if (!b) return; const v = b.dataset.dp;
@@ -2340,6 +2364,7 @@ document.addEventListener('click', e => {
     case 'cnext': { S.cal.m++; if (S.cal.m > 11) { S.cal.m = 0; S.cal.y++; } renderView(); break; }
     case 'selday': S.cal.sel = a.dataset.d; { const d = new Date(a.dataset.d + 'T00:00:00'); S.cal.y = d.getFullYear(); S.cal.m = d.getMonth(); } renderView(); break;
     case 'bkrange': openRangePop(a.dataset.w); break;
+    case 'trange': openRangePop(a.dataset.w, true); break;
     case 'newbooking': openBookingForm(null); break;
     case 'editbooking': openBookingForm(id); break;
     case 'nspot': if (S.F) { S.F.spot = a.dataset.k; S.F.dirty = true; document.querySelectorAll('#nspot button').forEach(b => b.classList.toggle('on', b === a)); } break;
