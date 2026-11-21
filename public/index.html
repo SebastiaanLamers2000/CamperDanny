@@ -19,7 +19,7 @@
 <style>
 /* layout: één schermvullende app; vijf tabs onderaan (Start, Kaart, Tijdlijn, Agenda, To-do), de actieve pagina erboven */
 :root{
-  --bg:#f5efe3; --surface:#fffcf5; --ink:#232b27; --muted:#6b756f; --line:#e3dac6;
+  --bg:#f5efe3; --surface:#fffcf5; --ink:#232b27; --muted:#5c665f; --line:#e3dac6;
   --accent:#1d6b64; --accent-ink:#ffffff; --orange:#d9742b; --violet:#7a6fa8; --green:#5b8f4a;
   --sea:#cfe2e4; --land:#eadfc6; --land-line:#c9bb98; --border:#a8986f; --danger:#b3392f; --shadow:0 6px 24px rgba(40,34,20,.14);
 }
@@ -51,7 +51,8 @@ header .sub{font-size:12px;color:var(--muted)}
 .kmbadge span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .iconbtn{border:1px solid var(--line);background:var(--surface);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px}
 #main{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
-.scroll{flex:1;overflow-y:auto;padding:14px 16px 96px;-webkit-overflow-scrolling:touch}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.scroll{flex:1;overflow-y:auto;padding:14px 16px 120px;-webkit-overflow-scrolling:touch}
 nav{display:flex;border-top:1px solid var(--line);background:var(--surface)}
 nav button{flex:1;border:0;background:none;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--muted)}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -103,7 +104,7 @@ nav button.on{color:var(--accent);font-weight:600}
 /* calendar */
 .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .calhead h2{font-size:19px;text-transform:capitalize}
-.calhead .iconbtn{width:34px;height:34px}
+.calhead .iconbtn{width:44px;height:44px}
 .dow,.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .dow span{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;padding:2px 0}
 .cell{border:1px solid var(--line);background:var(--surface);border-radius:9px;min-height:56px;padding:4px 3px 3px;display:flex;flex-direction:column;align-items:stretch;gap:3px;text-align:left}
@@ -144,7 +145,8 @@ nav button.on{color:var(--accent);font-weight:600}
 .cats button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 11px;font-size:13px}
 .cats button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .todo{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 11px;margin-bottom:8px}
-.chk{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--bg);display:grid;place-items:center;padding:0}
+.chk{position:relative;flex:none;width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--bg);display:grid;place-items:center;padding:0}
+.chk::after{content:'';position:absolute;inset:-8px}
 .chk svg{width:16px;height:16px;stroke:var(--bg);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
 .todo.done .chk{background:var(--green);border-color:var(--green)}
 .todo.done .chk svg{opacity:1}
@@ -174,7 +176,7 @@ img{max-width:100%}
 nav button{position:relative}
 .navdot{position:absolute;top:6px;left:calc(50% + 7px);width:10px;height:10px;border-radius:50%;background:var(--orange);border:2px solid var(--surface)}
 .authcard.wide{max-width:440px}
-.back{border:0;background:none;color:var(--accent);font-weight:600;padding:6px 0;margin:0 0 8px -2px;font-size:15px}
+.back{border:0;background:none;color:var(--accent);font-weight:600;padding:6px 0;margin:0 0 8px -2px;font-size:15px;min-height:44px}
 .primary.big{width:100%;padding:17px 18px;font-size:17px;border-radius:14px}
 .divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:26px 0 6px}
 .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -208,10 +210,10 @@ nav button{position:relative}
 .sheet h2{font-size:21px;margin-bottom:12px}
 .sheet label,.sheet .field{display:block;margin-bottom:12px}
 .lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
-input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+input,textarea,select{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
 input:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:0}
 textarea{min-height:70px;resize:vertical}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row2>*{min-width:0}.row2 input{min-width:0}
 .actions{display:flex;gap:10px;margin-top:16px}
 .actions button{flex:1}
 .primary,.ghost,.danger,.small{border-radius:12px;padding:12px 14px;border:1px solid var(--line);font-weight:600}
@@ -225,7 +227,7 @@ textarea{min-height:70px;resize:vertical}
 .stoprow .nm{flex:1;min-width:0}
 .stoprow .nm small{display:block;color:var(--muted);font-size:11px}
 .stoprow{touch-action:pan-y;user-select:none;-webkit-user-select:none}.stoprow.drag{position:relative;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.28);border-color:var(--accent);background:var(--card)}.stoprow .grip{flex:none;width:28px;align-self:stretch;display:grid;place-items:center;color:var(--muted);font-size:20px;cursor:grab;touch-action:none}
-.stoprow button{border:0;background:none;color:var(--muted);font-size:18px;padding:2px 6px}
+.stoprow button{border:0;background:none;color:var(--muted);font-size:18px;padding:8px 10px;min-width:42px;min-height:42px}
 .addstop{display:flex;gap:8px}
 .addstop button{white-space:nowrap}
 .sugs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -255,7 +257,7 @@ details summary{color:var(--muted);cursor:pointer}
 .tlb{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .tlh{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tlk{font-size:12px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
-.tle{border:0;background:none;color:var(--accent);font-size:13px;padding:2px 4px}
+.tle{border:0;background:none;color:var(--accent);font-size:13px;padding:12px 10px;min-height:44px}
 .tlb h4{margin:2px 0;font-size:16px}.tlb .m{font-size:12.5px;color:var(--muted)}
 .tlb .n{white-space:pre-wrap;font-size:14px;margin:6px 0}
 .tlb .dgrid{grid-template-columns:repeat(auto-fill,minmax(72px,1fr));margin:8px 0 4px}
@@ -283,6 +285,7 @@ details summary{color:var(--muted);cursor:pointer}
 .sugs.vert{flex-direction:column;align-items:stretch;gap:4px}.sugs.vert button{text-align:left;border-radius:10px;padding:9px 12px;font-size:14px;background:var(--surface)}
 .linkbtn+.linkbtn{margin-top:8px}
 .picker{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column}
+.rd.busyd{box-shadow:inset 0 -3px 0 var(--orange)}
 .datebtn{width:100%;text-align:left;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;min-height:44px}
 .dpick{padding:16px calc(16px + env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px));padding-top:calc(16px + env(safe-area-inset-top,0px));overflow-y:auto}
 .dpick .dpin{max-width:420px;width:100%;margin:0 auto}
@@ -320,7 +323,7 @@ a.tile{text-decoration:none;color:inherit}
 <div id="main"><div id="view" style="display:flex;flex-direction:column;flex:1;min-height:0"></div><div id="fabslot"></div></div>
 <nav id="nav"></nav>
 <div id="sheet"></div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="auth"></div>
 
 <script src="config.js"></script>
@@ -355,7 +358,8 @@ function fmtRange(a, b, withTime) {
   if (!b || dayOf(a) === dayOf(b)) return fmtDate(a, withTime) + (b && withTime && a !== b ? ' → ' + new Date(b).toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}) : '');
   return fmtDate(a, withTime) + ' → ' + fmtDate(b, withTime);
 }
-function nightsOf(t) { return t.start && t.end ? Math.max(0, diffDays(dayOf(t.start), dayOf(t.end))) : 0; }
+function tripThumbs(t) { const a = (t.thumbs || []).slice(); (t.nights || []).forEach(n => (n.thumbs || []).forEach(x => { if (a.length < 4) a.push(x); })); return a.slice(0, 4); }
+function nightsOf(t) { return Math.max(t.start && t.end ? Math.max(0, diffDays(dayOf(t.start), dayOf(t.end))) : 0, (t.nights || []).length); }
 
 /* ---------- kaartdata (vereenvoudigde contouren, lon,lat) ---------- */
 const LAND = [
@@ -598,7 +602,7 @@ async function doAuth() {
   try {
     const r = reg ? await S.sb.auth.signUp({ email, password: pass, options: { data: { name } } }) : await S.sb.auth.signInWithPassword({ email, password: pass });
     if (r.error) throw r.error;
-    if (!r.data || !r.data.session) { showAuth('in', 'Bevestig eerst je e-mailadres via de mail die we stuurden. Log daarna in.'); return; }
+    if (!r.data || !r.data.session) { showAuth('in', 'We stuurden een mail naar ' + email + '. Bevestig eerst je e-mailadres en log daarna in.'); const em = $('#a-email'); if (em) em.value = email; return; }
     await afterLogin(r.data.session.user);
   } catch (e) { const b = $('#a-go'); if (b) b.disabled = false; msg(authMsg(e), true); }
 }
@@ -635,7 +639,7 @@ async function afterLogin(user) {
   }
   S.role = data.role; S.me.name = data.name || S.me.name;
   if (S.role === 'pending') {
-    showMessage('Bijna binnen', 'Je account is aangemaakt. De beheerder moet je nog toegang geven. Probeer het later opnieuw.',
+    showMessage('Bijna binnen', 'Je account (' + (S.me.email || '') + ') is aangemaakt. Je krijgt toegang zodra de beheerder je goedkeurt. Je hoeft niets te doen: open de app later opnieuw.',
       '<button class="primary" data-auth="recheck" style="width:100%;margin-top:12px">Opnieuw controleren</button><button class="ghost" data-auth="logout" style="width:100%;margin-top:8px">Uitloggen</button>');
     return;
   }
@@ -697,7 +701,7 @@ document.addEventListener('click', async e => {
   const k = a.dataset.auth;
   if (k === 'mode') showAuth(S.authMode === 'up' ? 'in' : 'up');
   else if (k === 'logout') { try { await S.sb.auth.signOut(); } catch (x) {} location.reload(); }
-  else if (k === 'recheck') { try { const { data } = await S.sb.auth.getSession(); if (data.session) afterLogin(data.session.user); else location.reload(); } catch (x) { location.reload(); } }
+  else if (k === 'recheck') { const bt = $('[data-auth=recheck]'); if (bt) { bt.disabled = true; bt.textContent = 'Even kijken…'; } try { const { data } = await S.sb.auth.getSession(); if (data.session) { await afterLogin(data.session.user); if (S.role === 'pending') toast('Nog niet goedgekeurd. Gecontroleerd om ' + new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' }) + '.'); } else location.reload(); } catch (x) { location.reload(); } }
 });
 document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.role) changeRole(t.dataset.role, t.value); });
 
@@ -1087,7 +1091,7 @@ function timelineView() {
       const n = nightsOf(t);
       html += '<button class="tcard" data-act="detail" data-id="' + esc(t.id) + '" style="--c:' + tripColor(t) + '"><h3>' + esc(t.title) + '</h3><div class="tmeta">' + esc(fmtRange(t.start, t.end, true)) + (n ? ' · ' + n + (n === 1 ? ' nacht' : ' nachten') : '') + '</div><div class="pills">' +
         (t.km ? '<span class="pill km">' + fmtNum(t.km) + ' km</span>' : '') + (t.stops || []).map(s => '<span class="pill">' + esc(s.name.replace(/\s*\(.*\)/, '')) + '</span>').join('') + '</div>' +
-        ((t.thumbs || []).length ? '<div class="thumbrow">' + t.thumbs.map(p => '<img alt="" src="' + esc(p.t) + '">').join('') + '</div>' : '') + '</button>';
+        ((tripThumbs(t)).length ? '<div class="thumbrow">' + tripThumbs(t).map(p => '<img alt="" src="' + esc(p.t) + '">').join('') + '</div>' : '') + '</button>';
     });
     html += '</div>';
   }
@@ -1135,7 +1139,7 @@ function evHTML(e) {
 function openSheet(html, kind, id) {
   if (!$('#sheet .sheet')) pushStep();
   S.sheetKind = kind || ''; S.sheetId = id || null;
-  $('#sheet').innerHTML = '<div class="scrim" data-act="scrim"><div class="sheet" role="dialog">' + html + '</div></div>';
+  $('#sheet').innerHTML = '<div class="scrim" data-act="scrim"><div class="sheet" role="dialog" aria-modal="true">' + html + '</div></div>';
 }
 /* ---------- niet per ongeluk een formulier sluiten ---------- */
 const FORMKINDS = ['form', 'nightform', 'spotform', 'todoform', 'booking'];
@@ -1234,9 +1238,9 @@ async function commitNight(tid, n, onProgress) {
 async function saveNight() {
   const F = S.F; if (!F || F.saving) return;
   const name = F.title.trim() || (F.place && !/^Locatie /.test(F.place) ? F.place.split(',')[0].trim() : '');
+  if (F.lat == null || F.lon == null) { toast('Kies eerst de locatie op de kaart.'); return; }
   if (!name) { toast('Geef de plek een naam.'); return; }
   if (!F.date) { toast('Kies de datum van de nacht.'); return; }
-  if (F.lat == null || F.lon == null) { toast('Kies eerst de locatie op de kaart.'); return; }
   if (F.draft) {
     // tijdens het maken of bewerken van een reis: alleen onthouden, de reis schrijft alles weg bij “Opslaan”
     const T = S.TF; if (!T) return;
@@ -1727,12 +1731,14 @@ async function saveTrip() {
     const doc = { title, start: F.start, end: F.end || '', km: Math.max(0, parseFloat(String(F.km).replace(',', '.')) || 0), notes: F.notes.trim(), stops: stopsWithNights(F.stops, nights), thumbs, photoCount: count, nights,
       by: old ? (old.by || null) : (S.me ? S.me.id : null), createdAt: old ? (old.createdAt || Date.now()) : Date.now() };
     await ref.set(doc);
-    closeSheet(); toast(old ? 'Reis bijgewerkt' : 'Reis opgeslagen ✓ Voeg nu de nachten toe');
+    closeSheet(); toast(old ? 'Reis bijgewerkt' : (doc.nights.length ? 'Reis opgeslagen ✓' : 'Reis opgeslagen ✓ Voeg nu de nachten toe'));
     M.fitted = false; S.selTrip = null;
-    if (!old) { if (!S.trips.find(x => x.id === id)) S.trips.push(Object.assign({ id }, doc)); openDetail(id); }
+    if (old) Object.assign(old, doc); else if (!S.trips.find(x => x.id === id)) S.trips.push(Object.assign({ id }, doc));
+    openDetail(id);
   } catch (e) { F.saving = false; btn.disabled = false; btn.textContent = 'Opslaan'; dbFail(e); }
 }
 async function deleteTrip(id) {
+  if (S.delBusy) return; S.delBusy = true; toast('Verwijderen…');
   try {
     const snap = await S.db.collection('trips/' + id + '/photos').get();
     for (const d of snap.docs) await S.db.doc('trips/' + id + '/photos/' + d.id).delete();
@@ -1740,6 +1746,7 @@ async function deleteTrip(id) {
     delete S.photoCache[id]; if (S.selTrip === id) S.selTrip = null;
     closeSheet(); toast('Reis verwijderd');
   } catch (e) { dbFail(e); }
+  finally { S.delBusy = false; }
 }
 function confirmSheet(msg, yesLabel, act, id) {
   openSheet('<h2>Zeker weten?</h2><p style="margin:0 0 4px">' + esc(msg) + '</p><div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="danger" data-act="' + act + '" data-id="' + esc(id) + '">' + esc(yesLabel) + '</button></div>', 'confirm');
@@ -1748,7 +1755,11 @@ function confirmSheet(msg, yesLabel, act, id) {
 /* booking form */
 function openBookingForm(id, presetDate) {
   const b = id ? S.bookings.find(x => x.id === id) : null;
-  if (b && !canEditItem(b)) { toast('Alleen de maker of een beheerder kan dit aanpassen.'); return; }
+  if (b && !canEditItem(b)) {
+    const n = diffDays(b.start, b.end || b.start), who = b.by ? nameOf(b.by) : '';
+    openSheet('<h2>' + esc(b.title) + '</h2><p style="margin:0 0 8px"><b>' + esc(fmtLong(b.start)) + (n ? ' tot en met ' + esc(fmtLong(b.end)) : '') + '</b><br>' + esc(daysText(n)) + (who ? '<br>Door ' + esc(who) : '') + '</p>' + (b.notes ? '<p style="margin:0 0 8px;white-space:pre-wrap">' + esc(b.notes) + '</p>' : '') + '<div class="actions"><button class="ghost" data-act="close">Sluit</button></div>', 'bview', id);
+    return;
+  }
   const d = presetDate || S.cal.sel || todayStr();
   S.F = { id: id || null, title: b ? b.title : '', kind: b ? b.kind : 'reservering', start: b ? b.start : d, end: b ? (b.end || b.start) : d, notes: b ? b.notes || '' : '', warned: false, saving: false };
   openSheet(bookingHTML(), 'booking', id);
@@ -1774,12 +1785,12 @@ function openRangePop(which) {
     const first = new Date(P.y, P.m, 1), off = (first.getDay() + 6) % 7, dim = new Date(P.y, P.m + 1, 0).getDate(), today = todayStr();
     let cells = ''; for (let i = 0; i < off; i++) cells += '<span class="rd blank"></span>';
     for (let d = 1; d <= dim; d++) {
-      const ds = ymd(new Date(P.y, P.m, d)), edge = ds === P.a || ds === P.b, mid = ds > P.a && ds < P.b;
-      cells += '<button type="button" class="rd' + (ds === today ? ' today' : '') + (edge ? ' sel' : '') + (mid ? ' mid' : '') + '" data-dp="' + ds + '" aria-label="' + esc(fmtLong(ds)) + '">' + d + '</button>';
+      const ds = ymd(new Date(P.y, P.m, d)), edge = ds === P.a || ds === P.b, mid = ds > P.a && ds < P.b, bz = conflictsFor({ id: F.id, kind: F.kind, start: ds, end: ds }).length > 0;
+      cells += '<button type="button" class="rd' + (ds === today ? ' today' : '') + (edge ? ' sel' : '') + (mid ? ' mid' : '') + (bz ? ' busyd' : '') + '" data-dp="' + ds + '" aria-label="' + esc(fmtLong(ds)) + '">' + d + '</button>';
     }
     el.innerHTML = '<div class="dpin"><h2 style="margin:0 0 4px">Kies de periode</h2>' +
       '<div class="dstep"><div class="' + (P.step === 'start' ? 'on' : '') + '"><b>Van</b>' + esc(fmtLong(P.a)) + '</div><div class="' + (P.step === 'end' ? 'on' : '') + '"><b>Tot en met</b>' + esc(fmtLong(P.b)) + '</div></div>' +
-      '<div class="hint" style="margin-bottom:8px">' + (P.step === 'start' ? 'Tik op de eerste dag.' : 'Tik nu op de laatste dag.') + '</div>' +
+      '<div class="hint" style="margin-bottom:8px">' + (P.step === 'start' ? 'Tik op de eerste dag.' : 'Tik nu op de laatste dag.') + ' Dagen met een streepje zijn al bezet.</div>' + (conflictsFor({ id: F.id, kind: F.kind, start: P.a, end: P.b }).length ? '<div class="hint err" style="margin-bottom:8px">Let op: deze periode overlapt met ' + esc(conflictsFor({ id: F.id, kind: F.kind, start: P.a, end: P.b }).map(x => x.title).join(', ')) + '.</div>' : '') +
       '<div class="calhead"><button type="button" class="iconbtn" data-dp="prev" aria-label="Vorige maand">‹</button><h2>' + esc(first.toLocaleString('nl-BE', { month: 'long', year: 'numeric' })) + '</h2><button type="button" class="iconbtn" data-dp="next" aria-label="Volgende maand">›</button></div>' +
       '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(x => '<span>' + x + '</span>').join('') + '</div><div class="grid rgrid">' + cells + '</div>' +
       '<div class="actions" style="margin-top:14px"><button type="button" class="ghost" data-dp="cancel">Annuleer</button><button type="button" class="primary" data-dp="ok">Klaar</button></div></div>';
@@ -1935,7 +1946,7 @@ function showRequest() {
     '<label><span class="lbl">Naam</span><input id="r-name" autocomplete="name" maxlength="100"></label>' +
     '<label><span class="lbl">E-mailadres</span><input id="r-email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" maxlength="200"></label>' +
     '<label><span class="lbl">Telefoonnummer (optioneel)</span><input id="r-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="40"></label>' +
-    '<div class="field" style="margin-top:14px"><span class="lbl">Periode</span><div id="rcal"></div><div class="hint" id="rsum"></div></div>' +
+    '<div class="field" style="margin-top:14px"><span class="lbl">Periode</span><div class="hint" id="rsum"></div><div id="rcal"></div></div>' +
     '<label><span class="lbl">Opmerking (optioneel)</span><textarea id="r-note" maxlength="1000" placeholder="Met hoeveel personen ga je, waarheen, vragen…"></textarea></label>' +
     '<div class="hp" aria-hidden="true"><label>Laat dit veld leeg<input id="r-hp" name="website" tabindex="-1" autocomplete="off"></label></div>' +
     '<div class="hint" id="r-msg"></div>' +
@@ -1969,7 +1980,7 @@ function drawRcal() {
   el.innerHTML = '<div class="calhead"><button type="button" class="iconbtn" data-req="mprev" aria-label="Vorige maand"' + (shown <= cur ? ' disabled style="opacity:.35"' : '') + '>‹</button><h2>' + esc(title) + '</h2><button type="button" class="iconbtn" data-req="mnext" aria-label="Volgende maand"' + (shown >= cur + 18 ? ' disabled style="opacity:.35"' : '') + '>›</button></div>' +
     '<div class="dow">' + ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(d => '<span>' + d + '</span>').join('') + '</div><div class="grid rgrid">' + cells + '</div>' +
     '<div class="legend"><span><i style="background:var(--accent)"></i>Jouw keuze</span><span><i class="hatch"></i>Bezet</span></div>' +
-    (R.busyState === 'fail' ? '<div class="hint err">De bezette dagen konden niet geladen worden. Je kunt toch een aanvraag doen. We controleren de beschikbaarheid daarna zelf.</div>' : '');
+    (R.busyState === 'fail' ? '<div class="hint">Bezette dagen zijn nu niet te zien. Dien gerust toch in: we controleren de beschikbaarheid zelf.</div>' : '');
 }
 function drawRsum() {
   const el = $('#rsum'); if (!el) return;
@@ -1982,7 +1993,7 @@ function drawRsum() {
 }
 function pickDay(ds) {
   if (ds < todayStr() || isBusy(ds)) return;
-  R.hint = '';
+  R.hint = ''; { const m = $('#r-msg'); if (m && m.classList.contains('err')) { m.textContent = ''; m.className = 'hint'; } }
   if (!R.start || R.end) { R.start = ds; R.end = ''; }
   else if (ds < R.start) { R.start = ds; }
   else if (rangeHasBusy(R.start, ds)) { R.start = ds; R.end = ''; R.hint = 'Tussen die dagen zit een bezette dag. Kies een periode zonder bezette dagen.'; }
@@ -2037,7 +2048,7 @@ function showRequestDone(r, mail) {
     '<div class="roles" style="margin:12px 0"><b>' + esc(fmtLong(r.start)) + (n ? ' tot en met ' + esc(fmtLong(r.end)) : '') + '</b><br>' + esc(daysText(n)) + '<br>' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</div>' +
     (mail === 'sent' ? '<p>We stuurden een bevestiging naar <b>' + esc(r.email) + '</b>. Zie je niets, kijk dan ook in je spam.</p>' : '') +
     (mail === 'failed' ? '<p>De bevestigingsmail kon niet verstuurd worden, maar je aanvraag is wel aangekomen.</p>' : '') +
-    '<p>We nemen zo snel mogelijk contact met je op. Je aanvraag is pas definitief nadat we die hebben goedgekeurd.</p>' +
+    '<p>We nemen zo snel mogelijk contact met je op, meestal binnen een paar dagen. Je aanvraag is pas definitief nadat we die hebben goedgekeurd.</p>' +
     '<button class="primary big" type="button" data-req="done" style="margin-top:12px">Klaar</button>', true);
   const w = $('#auth .authwrap'); if (w) w.scrollTop = 0;
 }
