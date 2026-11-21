@@ -69,6 +69,7 @@ nav button.on{color:var(--accent);font-weight:600}
 .city{fill:var(--ink);stroke:var(--land);paint-order:stroke;stroke-linejoin:round;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
 .city.t1{font-weight:700}.city.t3,.city.t4{fill:var(--muted)}
 .cdot{fill:var(--ink);stroke:var(--land);opacity:.75}
+.mapyears{position:absolute;left:10px;top:46px;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 72px);z-index:2}.mapyears .chip{border:0;font:inherit;cursor:pointer;min-height:32px}.mapyears .chip.on{background:var(--accent);color:var(--accent-ink)}
 .mapchips{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none;max-width:calc(100% - 70px)}
 .chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .chip b{color:var(--accent)}
@@ -870,42 +871,84 @@ function mapLabels(vb, px, avoid) {
 /* ---------- kaart ---------- */
 const M = { cx: 8 * K, cy: -50, w: 40 * K, fitted: false };
 const favSpots = () => S.spots.filter(s => s.fav && hasLoc(s));
+function mapTrips() { return S.mapYear ? S.trips.filter(t => (t.start || '').slice(0, 4) === S.mapYear) : S.trips; }
+function mapStops() { const a = []; mapTrips().forEach(t => (t.stops || []).forEach(s => a.push(s))); return a; }
 function allStops() { const a = []; S.trips.forEach(t => (t.stops || []).forEach(s => a.push(s))); return a; }
 function mapView() {
-  const nStops = new Set(allStops().map(s => norm(s.name))).size;
-  const empty = !allStops().length && !favSpots().length;
+  const nStops = new Set(mapStops().map(s => norm(s.name))).size;
+  const empty = !mapStops().length && !favSpots().length;
+  const years = [...new Set(S.trips.map(t => (t.start || '').slice(0, 4)).filter(Boolean))].sort().reverse();
   return '<div id="mapwrap">' +
     '<svg id="mapsvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"><path class="land" d="' + (GEO.land || LAND_D) + '"/><path class="bord" d="' + GEO.bord + '"/><g id="lab"></g><g id="marks"></g></svg>' +
-    '<div class="mapchips"><span class="chip"><b>' + S.trips.length + '</b> reizen</span><span class="chip"><b>' + nStops + '</b> plaatsen</span>' + (favSpots().length ? '<span class="chip"><b class="heart">♥</b> ' + favSpots().length + (favSpots().length === 1 ? ' spot' : ' spots') + '</span>' : '') + '</div>' +
+    '<div class="mapchips"><span class="chip"><b>' + mapTrips().length + '</b> reizen</span><span class="chip"><b>' + nStops + '</b> plaatsen</span>' + (favSpots().length ? '<span class="chip"><b class="heart">♥</b> ' + favSpots().length + (favSpots().length === 1 ? ' spot' : ' spots') + '</span>' : '') + '</div>' +
+    (years.length > 1 ? '<div class="mapyears"><button class="chip' + (!S.mapYear ? ' on' : '') + '" data-act="mapyear" data-y="">Alle jaren</button>' + years.map(y => '<button class="chip' + (S.mapYear === y ? ' on' : '') + '" data-act="mapyear" data-y="' + esc(y) + '">' + esc(y) + '</button>').join('') + '</div>' : '') +
     '<div class="mapctl"><button class="mapbtn" data-act="zin" aria-label="Inzoomen">+</button><button class="mapbtn" data-act="zout" aria-label="Uitzoomen">−</button><button class="mapbtn" data-act="zfit" aria-label="Alles tonen" style="font-size:16px">⌖</button></div>' +
     (empty ? '<div class="mapempty"><b style="font-family:Fraunces,Georgia,serif;font-size:17px">' + (S.tripsLoaded ? 'Nog geen bestemmingen' : 'Laden…') + '</b>' + (S.tripsLoaded ? '<p>' + (writable() ? 'Voeg een reis met stops toe en ze verschijnen hier op de kaart.' : 'Zodra er reizen met stops zijn, zie je ze hier.') + '</p>' : '') + '</div>' : '') +
-    '<div class="mapnote">Vereenvoudigde kaart · stippellijn = luchtlijn tussen stops' + (favSpots().length ? ' · ♥ = zeker terug' : '') + '</div>' +
+    '<div class="mapnote">Vereenvoudigde kaart · volle lijn = route via de weg · stippellijn = luchtlijn' + (favSpots().length ? ' · ♥ = zeker terug' : '') + '</div>' +
     '<div id="mapcard"></div></div>';
 }
 function mapSize() { const r = $('#mapwrap').getBoundingClientRect(); return [r.width || 360, r.height || 420]; }
 function viewBox() { const s = mapSize(), h = M.w * s[1] / s[0]; return [M.cx - M.w / 2, M.cy - h / 2, M.w, h, M.w / s[0]]; }
-function fitMap() {
-  const pts = allStops().filter(s => isFinite(s.lat) && isFinite(s.lon)).concat(favSpots()).map(s => proj(s.lon, s.lat));
+function fitTarget() {
+  const pts = mapStops().filter(s => isFinite(s.lat) && isFinite(s.lon)).concat(favSpots()).map(s => proj(s.lon, s.lat));
   const s = mapSize();
-  if (!pts.length) { M.cx = 8 * K; M.cy = -50; M.w = Math.max(40 * K, 24 * K * s[0] / s[1] * 0.9); return; }
+  if (!pts.length) return { cx: 8 * K, cy: -50, w: Math.max(40 * K, 24 * K * s[0] / s[1] * 0.9) };
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
   const minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
-  M.cx = (minx + maxx) / 2; M.cy = (miny + maxy) / 2;
-  M.w = Math.max((maxx - minx) * 1.35, (maxy - miny) * 1.35 * s[0] / s[1], 9 * K);
+  return { cx: (minx + maxx) / 2, cy: (miny + maxy) / 2, w: Math.max((maxx - minx) * 1.35, (maxy - miny) * 1.35 * s[0] / s[1], 9 * K) };
 }
+function fitMap() { const t = fitTarget(); M.cx = t.cx; M.cy = t.cy; M.w = t.w; }
+/* vloeiend bewegen van de kaart */
+const easeIO = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+function stopAnim() { if (M.raf) cancelAnimationFrame(M.raf); M.raf = 0; M.tw = 0; M.smooth = false; }
+function animateView(t, ms) {
+  stopAnim(); const a = { cx: M.cx, cy: M.cy, w: M.w }, t0 = performance.now(); ms = ms || 380;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / ms), e = easeIO(k);
+    M.w = a.w * Math.pow(t.w / a.w, e); M.cx = a.cx + (t.cx - a.cx) * e; M.cy = a.cy + (t.cy - a.cy) * e; drawMap();
+    M.raf = k < 1 ? requestAnimationFrame(step) : 0;
+  };
+  M.raf = requestAnimationFrame(step);
+}
+// zoomen rond een punt van het scherm; opeenvolgende tikken en wielbewegingen lopen soepel in elkaar over
+function smoothZoom(f, cxp, cyp) {
+  const wrap = $('#mapwrap'); if (!wrap) return;
+  if (M.raf && !M.smooth) stopAnim();
+  M.tw = clamp((M.tw || M.w) * f, 0.5, 160); M.ax = cxp; M.ay = cyp;
+  if (M.raf) return;
+  M.smooth = true; let last = performance.now();
+  const step = now => {
+    const dt = Math.min(64, now - last); last = now;
+    const lr = Math.log(M.tw / M.w), al = 1 - Math.exp(-dt / 85);
+    const nw = Math.abs(lr) < 0.004 ? M.tw : M.w * Math.exp(lr * al);
+    zoomTo(nw, M.ax, M.ay);
+    if (nw === M.tw) { M.raf = 0; M.tw = 0; M.smooth = false; } else M.raf = requestAnimationFrame(step);
+  };
+  M.raf = requestAnimationFrame(step);
+}
+function zoomTo(nw, cxp, cyp) {
+  const wrap = $('#mapwrap'); if (!wrap) return;
+  const r = wrap.getBoundingClientRect(), vb = viewBox();
+  const wx = vb[0] + (cxp - r.left) * vb[4], wy = vb[1] + (cyp - r.top) * vb[4];
+  const npx = nw / r.width, nh = nw * r.height / r.width;
+  M.cx = wx - (cxp - r.left) * npx + nw / 2; M.cy = wy - (cyp - r.top) * npx + nh / 2; M.w = nw; drawMap();
+}
+let drawQ = 0;
+function drawSoon() { if (drawQ) return; drawQ = requestAnimationFrame(() => { drawQ = 0; drawMap(); }); }
 function initMap() {
   const wrap = $('#mapwrap'); if (!wrap) return;
   loadGeo();
-  const anyPts = allStops().length || favSpots().length;
+  const anyPts = mapStops().length || favSpots().length;
   if (!M.fitted && anyPts) { fitMap(); M.fitted = true; }
   else if (!anyPts) { fitMap(); }
   drawMap(); drawCard();
   const ptrs = new Map(); let moved = false, down = null, downT = null, lastDist = 0;
   const dist = () => { const a = [...ptrs.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
   wrap.onpointerdown = e => {
-    if (e.target.closest('.mapctl,.mapcard')) return;
+    if (e.target.closest('.mapctl,.mapcard,.mapyears')) return;
+    stopAnim();
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (ptrs.size === 1) { moved = false; down = { x: e.clientX, y: e.clientY }; downT = e.target.closest('[data-trip],[data-spot]'); }
+    if (ptrs.size === 1) { moved = false; down = { x: e.clientX, y: e.clientY }; downT = e.target.closest('[data-trip],[data-spot],[data-cl]'); }
     else { moved = true; lastDist = dist(); }
   };
   wrap.onpointermove = e => {
@@ -913,47 +956,104 @@ function initMap() {
     if (ptrs.size === 1) {
       if (!moved) { if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) return; moved = true; try { wrap.setPointerCapture(e.pointerId); } catch (x) {} }
       const px = viewBox()[4]; M.cx -= (e.clientX - p.x) * px; M.cy -= (e.clientY - p.y) * px;
-      p.x = e.clientX; p.y = e.clientY; drawMap();
+      p.x = e.clientX; p.y = e.clientY; drawSoon();
     } else if (ptrs.size === 2) {
       p.x = e.clientX; p.y = e.clientY;
       const a = [...ptrs.values()], d = dist();
-      if (lastDist) zoomAt(lastDist / d, (a[0].x + a[1].x) / 2, (a[0].y + a[1].y) / 2);
+      if (lastDist) zoomTo(clamp(M.w * lastDist / d, 0.5, 160), (a[0].x + a[1].x) / 2, (a[0].y + a[1].y) / 2);
       lastDist = d;
     }
   };
   const up = e => {
     if (!ptrs.has(e.pointerId)) return;
-    if (ptrs.size === 1 && !moved) { if (downT) { if (downT.dataset.spot) selectSpot(downT.dataset.spot); else selectTrip(downT.dataset.trip); } else if (S.selTrip || S.selSpot) { S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); } }
+    if (ptrs.size === 1 && !moved) { if (downT && downT.dataset.cl != null) zoomCluster(+downT.dataset.cl); else if (downT) { if (downT.dataset.spot) selectSpot(downT.dataset.spot); else selectTrip(downT.dataset.trip); } else if (S.selTrip || S.selSpot) { S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); } }
     ptrs.delete(e.pointerId); lastDist = 0;
   };
   wrap.onpointerup = up; wrap.onpointercancel = up;
-  wrap.onwheel = e => { e.preventDefault(); zoomAt(e.deltaY > 0 ? 1.18 : 0.85, e.clientX, e.clientY); };
+  wrap.onwheel = e => { e.preventDefault(); smoothZoom(Math.exp(clamp(e.deltaY, -120, 120) * 0.0018), e.clientX, e.clientY); };
 }
-function zoomAt(f, cxp, cyp) {
-  const wrap = $('#mapwrap'); if (!wrap) return;
-  const r = wrap.getBoundingClientRect(), vb = viewBox();
-  const wx = vb[0] + (cxp - r.left) * vb[4], wy = vb[1] + (cyp - r.top) * vb[4];
-  const nw = clamp(M.w * f, 0.5, 160), npx = nw / r.width, nh = nw * r.height / r.width;
-  M.cx = wx - (cxp - r.left) * npx + nw / 2; M.cy = wy - (cyp - r.top) * npx + nh / 2; M.w = nw; drawMap();
+function zoomAt(f, cxp, cyp) { smoothZoom(f, cxp, cyp); }
+function zoomCluster(i) {
+  const c = M.cl && M.cl[i]; if (!c) return; const sz = mapSize();
+  animateView({ cx: (c.minx + c.maxx) / 2, cy: (c.miny + c.maxy) / 2, w: Math.max((c.maxx - c.minx) * 2.4, (c.maxy - c.miny) * 2.4 * sz[0] / sz[1], Math.min(M.w * 0.45, 5 * K)) });
+}
+/* routes via de weg (OSRM), met bewaarde resultaten en luchtlijn als terugval */
+const ROUTES = (() => { try { return JSON.parse(localStorage.getItem('cd-routes') || '{}'); } catch (e) { return {}; } })();
+const RFAIL = new Set(), RQ = []; let rBusy = false, rSave = 0;
+const routeKey = (a, b) => a.lat.toFixed(3) + ',' + a.lon.toFixed(3) + '>' + b.lat.toFixed(3) + ',' + b.lon.toFixed(3);
+function saveRoutes() {
+  clearTimeout(rSave);
+  rSave = setTimeout(() => { try { localStorage.setItem('cd-routes', JSON.stringify(ROUTES)); } catch (e) { const k = Object.keys(ROUTES); k.slice(0, Math.ceil(k.length / 2)).forEach(x => delete ROUTES[x]); try { localStorage.setItem('cd-routes', JSON.stringify(ROUTES)); } catch (y) {} } }, 800);
+}
+const kmBetween = (a, b) => { const r = Math.PI / 180, dl = (b.lat - a.lat) * r, dn = (b.lon - a.lon) * r, h = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dn / 2) ** 2; return 12742 * Math.asin(Math.min(1, Math.sqrt(h))); };
+function wantRoute(a, b, first) {
+  const k = routeKey(a, b); if (ROUTES[k] || RFAIL.has(k) || RQ.some(q => q.k === k)) return;
+  if (kmBetween(a, b) < 0.8) { RFAIL.add(k); return; }
+  const q = { k, a, b }; if (first) RQ.unshift(q); else RQ.push(q); pumpRoutes();
+}
+async function pumpRoutes() {
+  if (rBusy) return; rBusy = true;
+  while (RQ.length) {
+    const q = RQ.shift(); let ok = false;
+    try {
+      const ac = new AbortController(), to = setTimeout(() => ac.abort(), 9000);
+      const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + q.a.lon + ',' + q.a.lat + ';' + q.b.lon + ',' + q.b.lat + '?overview=simplified&geometries=geojson', { signal: ac.signal });
+      clearTimeout(to); const j = await r.json(), g = j && j.routes && j.routes[0];
+      const direct = kmBetween(q.a, q.b);
+      if (g && g.geometry && g.geometry.coordinates.length > 1 && g.distance / 1000 < direct * 2.6 + 40) { ROUTES[q.k] = g.geometry.coordinates.map(c => [+c[0].toFixed(4), +c[1].toFixed(4)]); ok = true; }
+    } catch (e) {}
+    if (!ok) RFAIL.add(q.k); else { saveRoutes(); if ($('#mapsvg')) drawSoon(); }
+    await new Promise(res => setTimeout(res, 300));
+  }
+  rBusy = false;
 }
 function drawMap() {
   const svg = $('#mapsvg'); if (!svg) return;
-  const vb = viewBox(), px = vb[4];
+  const vb = viewBox(), px = vb[4], W = mapSize()[0];
   svg.setAttribute('viewBox', vb[0] + ' ' + vb[1] + ' ' + vb[2] + ' ' + vb[3]);
-  const trips = S.trips.slice().sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+  const trips = mapTrips().slice().sort((a, b) => (a.start || '').localeCompare(b.start || ''));
   const latest = sortedTrips().find(t => (t.stops || []).length);
-  let lines = '', dots = '', labels = '';
+  const many = trips.length > 8;
+  const inView = (q, pad) => q[0] > vb[0] - pad && q[0] < vb[0] + vb[2] + pad && q[1] > vb[1] - pad && q[1] < vb[1] + vb[3] + pad;
+  const tripsInView = trips.filter(t => (t.stops || []).some(s => isFinite(s.lat) && isFinite(s.lon) && inView(proj(s.lon, s.lat), 20 * px)));
+  const fetchOk = tripsInView.length <= 12;
+  let lines = '', labels = '';
+  const dots = [];
   trips.forEach(t => {
     const c = tripColor(t), st = (t.stops || []).filter(s => isFinite(s.lat) && isFinite(s.lon)), sel = S.selTrip === t.id;
-    const P = st.map(s => proj(s.lon, s.lat));
-    if (P.length > 1) lines += '<polyline points="' + P.map(p => p[0].toFixed(3) + ',' + p[1].toFixed(3)).join(' ') + '" fill="none" stroke="' + c + '" stroke-width="' + (sel ? 3.4 : 2.2) * px + '" stroke-dasharray="' + 7 * px + ' ' + 5 * px + '" stroke-linecap="round" opacity="' + (S.selTrip && !sel ? .35 : .9) + '"/>';
-    P.forEach((p, i) => {
-      dots += '<g data-trip="' + esc(t.id) + '" style="cursor:pointer"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (sel ? 7.5 : 5.5) * px + '" fill="' + c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (S.selTrip && !sel ? .45 : 1) + '"/></g>';
-      if (sel || M.w < 22) labels += '<text x="' + (p[0] + 9 * px) + '" y="' + (p[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(st[i].name.replace(/\s*\(.*\)/, '')) + '</text>';
-    });
+    const faded = S.selTrip && !sel, op = faded ? .3 : (many && !sel ? .55 : .9), sw = (sel ? 3.6 : many ? 1.8 : 2.4) * px;
+    const P = st.map(x => proj(x.lon, x.lat));
+    const vis = sel || (fetchOk && tripsInView.includes(t));
+    for (let i = 1; i < st.length; i++) {
+      const k = routeKey(st[i - 1], st[i]), g = ROUTES[k];
+      if (g) lines += '<polyline points="' + g.map(q => { const z = proj(q[0], q[1]); return z[0].toFixed(3) + ',' + z[1].toFixed(3); }).join(' ') + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + op + '"/>';
+      else {
+        lines += '<line x1="' + P[i - 1][0].toFixed(3) + '" y1="' + P[i - 1][1].toFixed(3) + '" x2="' + P[i][0].toFixed(3) + '" y2="' + P[i][1].toFixed(3) + '" stroke="' + c + '" stroke-width="' + sw + '" stroke-dasharray="' + 7 * px + ' ' + 5 * px + '" stroke-linecap="round" opacity="' + op + '"/>';
+        if (vis) wantRoute(st[i - 1], st[i], sel);
+      }
+    }
+    P.forEach((q, i) => dots.push({ x: q[0], y: q[1], sx: (q[0] - vb[0]) / px, sy: (q[1] - vb[1]) / px, t, c, sel, name: st[i].name, faded }));
+  });
+  // dichtbij elkaar liggende stippen samenvoegen tot één bol met aantal
+  const singles = [], cells = new Map(); M.cl = [];
+  dots.forEach(d => {
+    if (d.sel || M.w < 5 * K || d.sx < -40 || d.sy < -40 || d.sx > W + 40 || d.sy > vb[3] / px + 40) { singles.push(d); return; }
+    const key = Math.floor(d.sx / 40) + ',' + Math.floor(d.sy / 40); const a = cells.get(key); if (a) a.push(d); else cells.set(key, [d]);
+  });
+  let dotsH = '', clH = '';
+  cells.forEach(a => {
+    if (a.length === 1) { singles.push(a[0]); return; }
+    const mx = a.reduce((u, d) => u + d.x, 0) / a.length, my = a.reduce((u, d) => u + d.y, 0) / a.length, r = (11 + Math.min(7, a.length)) * px;
+    M.cl.push({ minx: Math.min(...a.map(d => d.x)), maxx: Math.max(...a.map(d => d.x)), miny: Math.min(...a.map(d => d.y)), maxy: Math.max(...a.map(d => d.y)), x: mx, y: my, r: r / px });
+    const i = M.cl.length - 1, allFaded = a.every(d => d.faded);
+    clH += '<g data-cl="' + i + '" style="cursor:pointer"><circle cx="' + mx + '" cy="' + my + '" r="' + (r + 6 * px) + '" fill="transparent"/><circle cx="' + mx + '" cy="' + my + '" r="' + r + '" fill="#1d6b64" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (allFaded ? .45 : .95) + '"/><text x="' + mx + '" y="' + (my + 4.5 * px) + '" font-size="' + 12.5 * px + '" font-weight="700" text-anchor="middle" fill="#fff" style="pointer-events:none;font-family:sans-serif">' + a.length + '</text></g>';
+  });
+  singles.forEach(d => {
+    dotsH += '<g data-trip="' + esc(d.t.id) + '" style="cursor:pointer"><circle cx="' + d.x + '" cy="' + d.y + '" r="' + 16 * px + '" fill="transparent"/><circle cx="' + d.x + '" cy="' + d.y + '" r="' + (d.sel ? 7.5 : 5.5) * px + '" fill="' + d.c + '" stroke="#fff" stroke-width="' + 2 * px + '" opacity="' + (d.faded ? .45 : 1) + '"/></g>';
+    if (d.sel || M.w < 22) labels += '<text x="' + (d.x + 9 * px) + '" y="' + (d.y + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(String(d.name).replace(/\s*\(.*\)/, '')) + '</text>';
   });
   let van = '';
-  if (latest) { const st = latest.stops.filter(s => isFinite(s.lat) && isFinite(s.lon)); const l = st[st.length - 1]; if (l) { const p = proj(l.lon, l.lat); van = '<text x="' + p[0] + '" y="' + (p[1] - 10 * px) + '" font-size="' + 20 * px + '" text-anchor="middle" style="pointer-events:none">🚐</text>'; } }
+  if (latest && (!S.mapYear || trips.includes(latest))) { const st = latest.stops.filter(x => isFinite(x.lat) && isFinite(x.lon)); const l = st[st.length - 1]; if (l) { const q = proj(l.lon, l.lat); van = '<text x="' + q[0] + '" y="' + (q[1] - 10 * px) + '" font-size="' + 20 * px + '" text-anchor="middle" style="pointer-events:none">🚐</text>'; } }
   let hearts = '', hlabels = '';
   favSpots().forEach(s => {
     const q = proj(s.lon, s.lat), sel = S.selSpot === s.id, r = (sel ? 11 : 9) * px;
@@ -961,14 +1061,11 @@ function drawMap() {
     if (sel || M.w < 22) hlabels += '<text x="' + (q[0] + 13 * px) + '" y="' + (q[1] + 4 * px) + '" font-size="' + 11.5 * px + '" fill="#222" stroke="#fff" stroke-width="' + 3 * px + '" paint-order="stroke" stroke-linejoin="round" style="pointer-events:none;font-family:sans-serif">' + esc(s.title) + '</text>';
   });
   const avoid = [];
-  trips.forEach(t => (t.stops || []).filter(s => isFinite(s.lat) && isFinite(s.lon)).forEach(s => {
-    const q = proj(s.lon, s.lat), x = (q[0] - vb[0]) / px, y = (q[1] - vb[1]) / px;
-    avoid.push([x - 9, y - 22, 18, 31]);
-    if (S.selTrip === t.id || M.w < 22) avoid.push([x + 6, y - 9, String(s.name).replace(/\s*\(.*\)/, '').length * 6.6 + 8, 18]);
-  }));
+  singles.forEach(d => { avoid.push([d.sx - 9, d.sy - 22, 18, 31]); if (d.sel || M.w < 22) avoid.push([d.sx + 6, d.sy - 9, String(d.name).replace(/\s*\(.*\)/, '').length * 6.6 + 8, 18]); });
+  M.cl.forEach(c => { const x = (c.x - vb[0]) / px, y = (c.y - vb[1]) / px; avoid.push([x - c.r - 2, y - c.r - 2, 2 * c.r + 4, 2 * c.r + 4]); });
   favSpots().forEach(s => { const q = proj(s.lon, s.lat), x = (q[0] - vb[0]) / px, y = (q[1] - vb[1]) / px; avoid.push([x - 11, y - 11, 22, 22]); if (S.selSpot === s.id || M.w < 22) avoid.push([x + 10, y - 9, String(s.title).length * 6.6 + 8, 18]); });
   const lab = $('#lab'); if (lab) lab.innerHTML = mapLabels(vb, px, avoid);
-  $('#marks').innerHTML = lines + dots + hearts + labels + hlabels + van;
+  $('#marks').innerHTML = lines + dotsH + clH + hearts + labels + hlabels + van;
 }
 function selectTrip(id) { S.selTrip = id; S.selSpot = null; drawMap(); drawCard(); }
 function selectSpot(id) { S.selSpot = id; S.selTrip = null; drawMap(); drawCard(); }
@@ -1206,13 +1303,14 @@ async function openNightForm(tid, nid, draft) {
   const date = n ? n.date || '' : (last && last.date ? addDaysStr(last.date, 1) : (startDay || todayStr()));
   const title = draft ? (S.TF.title || 'Nieuwe reis') : t.title;
   S.F = { kind: 'night', draft: !!draft, tid: draft ? S.TF.id : tid, nid: nid || null, title: n ? n.name : '', place: n ? n.place || '' : '', lat: n && n.lat != null ? n.lat : null, lon: n && n.lon != null ? n.lon : null, locFor: n ? n.place || '' : '',
-    date, notes: n ? n.notes || '' : '', newPhotos: n && n.newPhotos ? n.newPhotos.slice() : [], existing: [], remove: n && n.remove ? Object.assign({}, n.remove) : {}, saving: false };
+    date, spot: n ? (n.spot || (n.spotId ? ((S.spots.find(x => x.id === n.spotId) || {}).fav ? 'fav' : 'spot') : 'none')) : 'none', spotId: n ? n.spotId || null : null, notes: n ? n.notes || '' : '', newPhotos: n && n.newPhotos ? n.newPhotos.slice() : [], existing: [], remove: n && n.remove ? Object.assign({}, n.remove) : {}, saving: false };
   openSheet('<h2>' + esc(title) + '</h2><div class="tmeta" style="margin-top:-6px">' + (n ? 'Slaapplaats bewerken' : 'Nieuwe slaapplaats') + '</div>' +
     '<label><span class="lbl">Datum van de nacht</span><input type="date" data-f="date" value="' + esc(date) + '"></label>' +
     '<div class="field"><span class="lbl">Locatie</span><button class="locbtn" id="spotlocbtn" data-act="nightmap">' + locBtnHTML(S.F) + '</button></div>' +
     '<label><span class="lbl">Naam van de plek</span><input id="ntitle" data-f="title" placeholder="bv. Camping aan het meer" value="' + esc(S.F.title) + '"></label>' +
     '<label><span class="lbl">Commentaar</span><textarea data-f="notes" placeholder="Hoe was het? Uitzicht, prijs, tips, wat jullie deden…">' + esc(S.F.notes) + '</textarea></label>' +
     '<div class="field"><span class="lbl">Foto’s</span><div class="photos" id="photos"></div><label class="filebtn">+ Foto’s toevoegen<input type="file" accept="image/*" multiple hidden id="photoin"></label><div class="hint" id="photomsg"></div></div>' +
+    ('<div class="field"><span class="lbl">Ook bij Spots bewaren?</span><div class="kinds" id="nspot">' + [['none', 'Niet'], ['spot', 'In Spots'], ['fav', '♥ Zeker terug']].map(x => '<button type="button" class="' + (S.F.spot === x[0] ? 'on' : '') + '" data-act="nspot" data-k="' + x[0] + '">' + x[1] + '</button>').join('') + '</div><div class="hint">Dan staat deze plek ook in de lijst met Spots, zonder dat je ze nog eens moet invoeren.</div></div>') +
     '<div class="actions">' + (n && (draft || canDeleteItem(t)) ? '<button class="danger" data-act="delnight" data-id="' + esc(tid || '') + '" data-n="' + esc(nid) + '">Verwijder</button>' : '') + '<button class="ghost" data-act="nightcancel" data-id="' + esc(tid || '') + '">Annuleer</button><button class="primary" id="savebtn" data-act="savenight">' + (draft ? 'Klaar' : 'Opslaan') + '</button></div>', 'nightform', tid);
   renderPhotos();
   if (n && n.photoCount && S.db && tid) {
@@ -1238,7 +1336,28 @@ async function commitNight(tid, n, onProgress) {
     await pr.set({ data: np[i].full, thumb: np[i].thumb, at: Date.now() + i, by: S.me ? S.me.id : null, night: n.id });
     count++; if (thumbs.length < 3) thumbs.push({ id: np[i].id, t: np[i].thumb });
   }
-  return { id: n.id, date: n.date, name: n.name, place: n.place, lat: n.lat, lon: n.lon, notes: n.notes, thumbs, photoCount: count, at: n.at };
+  let spotId = n.spotId || null;
+  try { spotId = await syncNightSpot(tid, n, np) || spotId; } catch (e) { toast('Slaapplaats bewaard, maar niet bij Spots gezet.'); }
+  const out = { id: n.id, date: n.date, name: n.name, place: n.place, lat: n.lat, lon: n.lon, notes: n.notes, thumbs, photoCount: count, at: n.at };
+  if (n.spot && n.spot !== 'none') { out.spot = n.spot; out.spotId = spotId; } else if (spotId) out.spotId = spotId;
+  return out;
+}
+// zet een slaapplaats ook in de lijst met Spots (maakt aan of werkt bij), zodat je ze niet dubbel moet invoeren
+async function syncNightSpot(tid, n, np) {
+  if (!n.spot || n.spot === 'none' || !S.db) return n.spotId || null;
+  const fav = n.spot === 'fav', fields = { title: n.name, place: n.place, lat: n.lat, lon: n.lon, notes: n.notes || '', fav };
+  if (n.spotId) {
+    const cur = await S.db.doc('spots/' + n.spotId).get();
+    if (cur.exists) { await S.db.doc('spots/' + n.spotId).update(fields); return n.spotId; }
+  }
+  const ref = S.db.collection('spots').doc(), id = ref.id, thumbs = []; let count = 0;
+  for (const p of np.slice(0, 3)) {
+    p.sid = p.sid || newId();
+    await S.db.doc('spots/' + id + '/photos/' + p.sid).set({ data: p.full, thumb: p.thumb, at: Date.now() + count, by: S.me ? S.me.id : null });
+    count++; thumbs.push({ id: p.sid, t: p.thumb });
+  }
+  await ref.set(Object.assign({ price: null, link: null, thumbs, photoCount: count, by: S.me ? S.me.id : null, createdAt: Date.now(), fromTrip: tid, fromNight: n.id }, fields));
+  return id;
 }
 async function saveNight() {
   const F = S.F; if (!F || F.saving) return;
@@ -1251,7 +1370,7 @@ async function saveNight() {
     const T = S.TF; if (!T) return;
     const old = F.nid ? T.nights.find(x => x.id === F.nid) : null;
     const item = { id: F.nid || newId(), date: F.date, name, place: F.place.trim() || name, lat: +F.lat, lon: +F.lon, notes: F.notes.trim(), thumbs: old ? old.thumbs || [] : [], photoCount: old ? old.photoCount || 0 : 0,
-      at: old ? (old.at || Date.now()) : Date.now(), newPhotos: F.newPhotos, remove: F.remove };
+      at: old ? (old.at || Date.now()) : Date.now(), newPhotos: F.newPhotos, remove: F.remove, spot: F.spot, spotId: F.spotId };
     if (old) T.nights[T.nights.indexOf(old)] = item; else T.nights.push(item);
     S.F = T; S.TF = null; showTripForm(); return;
   }
@@ -1261,7 +1380,7 @@ async function saveNight() {
     const nights = (t.nights || []).map(x => Object.assign({}, x));
     const old = F.nid ? nights.find(x => x.id === F.nid) : null, nid = F.nid || newId();
     const item = await commitNight(F.tid, { id: nid, date: F.date, name, place: F.place.trim() || name, lat: +F.lat, lon: +F.lon, notes: F.notes.trim(), thumbs: old ? old.thumbs : [], photoCount: old ? old.photoCount || 0 : 0,
-      at: old ? (old.at || Date.now()) : Date.now(), newPhotos: F.newPhotos, remove: F.remove }, (i, n) => { btn.textContent = 'Foto ' + i + '/' + n + '…'; });
+      at: old ? (old.at || Date.now()) : Date.now(), newPhotos: F.newPhotos, remove: F.remove, spot: F.spot, spotId: F.spotId }, (i, n) => { btn.textContent = 'Foto ' + i + '/' + n + '…'; });
     delete S.photoCache[F.tid];
     if (old) nights[nights.indexOf(old)] = item; else nights.push(item);
     const stops = stopsWithNights(t.stops, nights);
@@ -2194,7 +2313,8 @@ document.addEventListener('click', e => {
     case 'close': closeSheet(); break;
     case 'zin': { const r = $('#mapwrap').getBoundingClientRect(); zoomAt(0.6, r.left + r.width / 2, r.top + r.height / 2); break; }
     case 'zout': { const r = $('#mapwrap').getBoundingClientRect(); zoomAt(1.65, r.left + r.width / 2, r.top + r.height / 2); break; }
-    case 'zfit': fitMap(); S.selTrip = null; S.selSpot = null; drawMap(); drawCard(); break;
+    case 'zfit': S.selTrip = null; S.selSpot = null; drawCard(); animateView(fitTarget()); break;
+    case 'mapyear': S.mapYear = a.dataset.y || null; S.selTrip = null; S.selSpot = null; M.fitted = false; renderView(); break;
     case 'detail': openDetail(id); break;
     case 'newtrip': openTripForm(null); break;
     case 'edittrip': openTripForm(id); break;
@@ -2222,6 +2342,7 @@ document.addEventListener('click', e => {
     case 'bkrange': openRangePop(a.dataset.w); break;
     case 'newbooking': openBookingForm(null); break;
     case 'editbooking': openBookingForm(id); break;
+    case 'nspot': if (S.F) { S.F.spot = a.dataset.k; S.F.dirty = true; document.querySelectorAll('#nspot button').forEach(b => b.classList.toggle('on', b === a)); } break;
     case 'kind': S.F.kind = a.dataset.k; S.F.warned = false; { const sc = $('#sheet .sheet').scrollTop; $('#sheet .sheet').innerHTML = bookingHTML(); $('#sheet .sheet').scrollTop = sc; } break;
     case 'savebooking': saveBooking(); break;
     case 'delbooking': confirmSheet('Deze boeking wordt verwijderd uit de agenda.', 'Ja, verwijder', 'delbooking2', id); break;
