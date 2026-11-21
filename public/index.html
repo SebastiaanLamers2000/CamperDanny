@@ -76,7 +76,7 @@ nav button.on{color:var(--accent);font-weight:600}
 .mapctl{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
 .mapctl button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .mapcard{position:absolute;left:12px;bottom:84px;right:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;box-shadow:var(--shadow)}
-.mcimg{display:block;width:100%;height:108px;object-fit:cover;border-radius:10px;margin-bottom:8px}
+.mcimg{display:block;width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:8px}
 .mapcard h3{font-size:16px}
 .mapcard .m{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .mapnote{position:absolute;left:12px;bottom:6px;font-size:10.5px;color:var(--muted);opacity:.9;pointer-events:none}
@@ -1078,17 +1078,29 @@ function drawMap() {
 }
 function selectTrip(id, stop) { S.selTrip = id; S.selStop = stop != null && stop !== '' ? +stop : null; S.selSpot = null; drawMap(); drawCard(); }
 function selectSpot(id) { S.selSpot = id; S.selTrip = null; S.selStop = null; drawMap(); drawCard(); }
-function drawCard() {
+const PH = new Map();
+// de kaart toont eerst het kleine voorbeeld en vervangt het door de volle foto zodra die binnen is
+async function sharpenCardImg() {
+  const im = $('#mapcard img.mcimg'); if (!im) return; const pid = im.dataset.pid, kind = im.dataset.kind, par = im.dataset.par;
+  if (!okId(pid) || !okId(par) || !S.db) return;
+  try {
+    let full = PH.get(pid);
+    if (!full) { const d = await S.db.doc(kind + '/' + par + '/photos/' + pid).get(); full = d.exists && d.data() && d.data().data; if (!full) return; PH.set(pid, full); if (PH.size > 12) PH.delete(PH.keys().next().value); }
+    const cur = $('#mapcard img.mcimg'); if (cur && cur.dataset.pid === pid) cur.src = full;
+  } catch (e) {}
+}
+function drawCard() { drawCard0(); sharpenCardImg(); }
+function drawCard0() {
   const el = $('#mapcard'); if (!el) return;
   const sp = S.selSpot ? S.spots.find(x => x.id === S.selSpot) : null;
-  const img = th => th ? '<img class="mcimg" alt="" src="' + esc(th) + '">' : '';
-  if (sp) { el.innerHTML = '<div class="mapcard">' + img(sp.thumbs && sp.thumbs[0] && sp.thumbs[0].t) + '<h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
+  const img = (th, kind, par) => th && th.t ? '<img class="mcimg" alt="" src="' + esc(th.t) + '" data-pid="' + esc(th.id) + '" data-kind="' + kind + '" data-par="' + esc(par) + '">' : '';
+  if (sp) { el.innerHTML = '<div class="mapcard">' + img(sp.thumbs && sp.thumbs[0], 'spots', sp.id) + '<h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
   const t = S.trips.find(x => x.id === S.selTrip);
   if (!t) { el.innerHTML = ''; return; }
   const st = (t.stops || []).filter(x => isFinite(x.lat) && isFinite(x.lon)), stop = S.selStop != null ? st[S.selStop] : null;
   if (stop) {
     const nt = stop.night ? (t.nights || []).find(x => x.id === stop.night) : null, note = nt && nt.notes ? nt.notes.trim() : '';
-    el.innerHTML = '<div class="mapcard">' + img(nt && nt.thumbs && nt.thumbs[0] && nt.thumbs[0].t) + '<h3>' + esc(nt ? nt.name : String(stop.name).replace(/\s*\(.*\)/, '')) + '</h3><div class="m">' + esc([nt && nt.date ? fmtLong(nt.date) : '', t.title].filter(Boolean).join(' · ')) + '</div>' +
+    el.innerHTML = '<div class="mapcard">' + img((nt && nt.thumbs && nt.thumbs[0]) || tripThumbs(t)[0], 'trips', t.id) + '<h3>' + esc(nt ? nt.name : String(stop.name).replace(/\s*\(.*\)/, '')) + '</h3><div class="m">' + esc([nt && nt.date ? fmtLong(nt.date) : '', t.title].filter(Boolean).join(' · ')) + '</div>' +
       (note ? '<div class="m" style="color:var(--ink)">' + esc(note.length > 90 ? note.slice(0, 88) + '…' : note) + '</div>' : '') + '<button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
     return;
   }
