@@ -135,6 +135,7 @@ nav button.on{color:var(--accent);font-weight:600}
 .tile .s{font-size:12.5px;color:var(--muted);display:block;overflow-wrap:anywhere}
 .tile.alert svg{stroke:var(--danger)}
 .tile.alert .s{color:var(--danger)}
+.qbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:13px 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;min-height:60px}.qbtn b{font-size:16px}.qbtn span{font-size:13px;color:var(--muted);font-weight:400;line-height:1.3}.qbtn.main{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.qbtn.main span{color:inherit;opacity:.9}
 .quick{display:flex;flex-direction:column;gap:10px;margin-top:14px}
 /* to-do */
 .stats.three{grid-template-columns:repeat(3,1fr)}
@@ -732,7 +733,7 @@ function renderNav() {
 }
 function renderFab() {
   if (!writable() || S.tab === 'home' || (S.tab === 'agenda' && S.reqTab === 'req')) { $('#fabslot').innerHTML = ''; return; }
-  const m = { agenda: ['newbooking', 'Reserveren'], todo: ['newtodo', 'Nieuw punt'], spots: ['newspot', 'Nieuwe spot'] }[S.tab] || ['newtrip', 'Nieuwe reis'];
+  const m = { agenda: ['newbooking', 'Reserveren'], todo: ['newtodo', 'Nieuw punt'], spots: ['newspot', 'Nieuwe spot'] }[S.tab] || ['newtrip', 'Reis vastleggen'];
   $('#fabslot').innerHTML = '<button class="fab" data-act="' + m[0] + '"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>' + m[1] + '</button>';
 }
 function render() { renderHeader(); renderView(); renderNav(); }
@@ -1003,7 +1004,11 @@ function homeView() {
   if (full()) h += tile('spots', 'Leuke spots', S.spots.length ? S.spots.length + (S.spots.length === 1 ? ' plek bewaard' : ' plekken bewaard') + (S.spots.some(s => s.fav) ? ' · ' + S.spots.filter(s => s.fav).length + ' ♥' : '') : 'Bewaar mooie overnachtingsplekken', 'wide');
   h += '<a class="tile wide" href="info/">' + ICONS.info + '<div><b>Info over de camper</b><span class="s">Handleiding, checklists en noodnummers</span></div></a>';
   h += '</div>';
-  if (writable()) h += '<div class="quick"><button class="primary" data-act="newtrip">+ Nieuwe reis toevoegen</button><div class="row2"><button class="ghost" data-act="newbooking">Camper reserveren</button>' + (isGuest() ? '' : '<button class="ghost" data-act="newtodo">To-do toevoegen</button>') + '</div><button class="ghost" data-act="copylink">Link voor klanten kopiëren</button></div>';
+  if (writable()) h += '<div class="quick">' +
+    '<button class="qbtn main" data-act="newbooking"><b>Camper reserveren</b><span>Datums vastleggen in de agenda</span></button>' +
+    '<button class="qbtn" data-act="newtrip"><b>Reis vastleggen</b><span>Een reis die bezig is of gedaan is: slaapplaatsen, foto’s en kilometers</span></button>' +
+    (isGuest() ? '' : '<button class="qbtn" data-act="newtodo"><b>To-do toevoegen</b><span>Iets om te herstellen, te verbeteren of te kopen</span></button>') +
+    '<button class="ghost" data-act="copylink">Link voor klanten kopiëren</button></div>';
   else if (S.canWrite === false) h += '<div class="roles" style="margin-top:14px">Je hebt toegang tot de kaart en de tijdlijn.</div>';
   return h + '</div>';
 }
@@ -1082,7 +1087,7 @@ function timelineView() {
   const places = new Set(allStops().map(s => norm(s.name))).size;
   let html = '<div class="scroll"><div class="stats"><div class="stat"><b>' + fmtNum(totalKm()) + '</b><span>km</span></div><div class="stat"><b>' + S.trips.length + '</b><span>reizen</span></div><div class="stat"><b>' + nights + '</b><span>nachten</span></div><div class="stat"><b>' + places + '</b><span>plaatsen</span></div></div>';
   if (!ts.length) {
-    html += '<div class="empty"><b>Nog geen reizen</b>' + (writable() ? 'Tik op “Nieuwe reis” om jullie eerste rit vast te leggen.' : 'Er zijn nog geen reizen toegevoegd.') + '</div>';
+    html += '<div class="empty"><b>Nog geen reizen</b>' + (writable() ? 'Tik op “Reis vastleggen” om jullie eerste rit vast te leggen. Wil je alleen datums reserveren? Doe dat in de Agenda.' : 'Er zijn nog geen reizen toegevoegd.') + '</div>';
   } else {
     let yr = '';
     ts.forEach(t => {
@@ -1629,7 +1634,7 @@ async function openTripForm(id) {
 }
 function showTripForm() {
   const F = S.F, t = F.id ? S.trips.find(x => x.id === F.id) : null;
-  const html = '<h2>' + (t ? 'Reis bewerken' : 'Nieuwe reis') + '</h2>' +
+  const html = '<h2>' + (t ? 'Reis bewerken' : 'Reis vastleggen') + '</h2>' +
     '<label><span class="lbl">Titel</span><input data-f="title" placeholder="bv. Weekend Ardennen" value="' + esc(F.title) + '"></label>' +
     '<div class="row2"><label><span class="lbl">Vertrek</span><input type="datetime-local" data-f="start" value="' + esc(F.start) + '"></label><label><span class="lbl">Terug</span><input type="datetime-local" data-f="end" value="' + esc(F.end) + '"></label></div>' +
     '<label><span class="lbl">Gereden kilometers</span><input type="number" inputmode="decimal" min="0" data-f="km" placeholder="bv. 412" value="' + esc(F.km) + '"></label>' +

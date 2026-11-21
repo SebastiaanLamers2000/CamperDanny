@@ -1,4 +1,4 @@
-const V="danny-1795000000000";const F=["./index.html","./vertrek.html","./boiler.html","./verwarming.html","./bed.html","./douche.html","./wc.html","./water.html","./koken.html","./elektriciteit.html","./frigo.html","./terugbrengen.html","./benodigdheden.html","./noodgeval.html","./problemen.html","./style.css","./site.js","./icon.svg","./icon-192.png","./img/gas.jpg"];
+const V="danny-1795100000000";const F=["./index.html","./vertrek.html","./boiler.html","./verwarming.html","./bed.html","./douche.html","./wc.html","./water.html","./koken.html","./elektriciteit.html","./frigo.html","./terugbrengen.html","./benodigdheden.html","./noodgeval.html","./problemen.html","./style.css","./site.js","./icon.svg","./icon-192.png","./img/gas.jpg"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(F)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 // Netwerk eerst, maar bij slecht bereik (3 seconden) meteen de bewaarde pagina tonen. Alleen eigen, geslaagde antwoorden bewaren.
