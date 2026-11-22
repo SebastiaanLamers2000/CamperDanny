@@ -253,7 +253,9 @@ details summary{color:var(--muted);cursor:pointer}
 .filebtn{display:inline-block;border:1px dashed var(--accent);color:var(--accent);padding:9px 14px;border-radius:10px;font-weight:600;cursor:pointer}
 .kinds{display:flex;gap:6px;flex-wrap:wrap}
 .kinds button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 12px;font-size:13.5px}
-.kinds button.on{background:var(--c);color:var(--bg);border-color:var(--c)}
+.kinds button.on{background:var(--c,var(--accent));color:var(--bg);border-color:var(--c,var(--accent));font-weight:700}
+#nspot button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.kinds button{min-height:40px}
 .dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
 .dgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
 .kv{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
