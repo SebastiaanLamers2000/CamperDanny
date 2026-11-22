@@ -1,0 +1,3 @@
+-- Meldingen: nieuwe boeking + herinnering dag vóór vertrek (al toegepast via Supabase-connector)
+-- Functies: notify_push_ex, trg_booking_push (trigger push_on_booking op docs), send_booking_reminders
+-- pg_cron-job 'camper-herinnering': dagelijks 16:00 UTC -> select public.send_booking_reminders()

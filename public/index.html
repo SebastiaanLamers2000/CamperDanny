@@ -115,6 +115,7 @@ nav button.on{color:var(--accent);font-weight:600}
 .cell.sel{outline:2px solid var(--accent);outline-offset:-1px}
 .dn{font-size:12px;font-weight:600;padding-left:3px;height:20px;line-height:20px}
 .bar{height:5px;border-radius:3px;background:var(--c)}
+.who{font-size:9.5px;line-height:1.1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:1px}
 .more{font-size:9.5px;color:var(--muted);padding-left:2px}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--muted);margin:10px 2px 4px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
@@ -222,6 +223,8 @@ textarea{min-height:70px;resize:vertical}
 .primary,.ghost,.danger,.small{border-radius:12px;padding:12px 14px;border:1px solid var(--line);font-weight:600}
 .primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .primary:disabled{opacity:.55}
+a.btn{display:block;border-radius:12px;padding:12px 14px;border:1px solid var(--line);font-weight:600;min-height:44px;text-decoration:none;color:inherit}
+a.btn.primary{color:var(--accent-ink)}
 .ghost{background:transparent}
 .danger{background:transparent;color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,transparent)}
 .small{padding:6px 11px;font-size:13px;background:var(--bg);font-weight:500}
@@ -582,7 +585,7 @@ function showAuth(mode, msg, isErr) {
     '<label><span class="lbl">Wachtwoord</span><input id="a-pass" type="password" autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></label>' +
     '<div class="hint' + (isErr ? ' err' : '') + '" id="a-msg">' + esc(msg || '') + '</div>' +
     '<button class="primary" id="a-go" type="submit" style="width:100%;margin-top:12px">' + (reg ? 'Account maken' : 'Inloggen') + '</button>' +
-    '<button class="ghost" type="button" data-auth="mode" style="width:100%;margin-top:8px">' + (reg ? 'Ik heb al een account' : 'Nieuw account maken') + '</button></form>');
+    (reg ? '' : '<button class="ghost" type="button" data-auth="forgot" style="width:100%;margin-top:8px">Wachtwoord vergeten?</button>') + '<button class="ghost" type="button" data-auth="mode" style="width:100%;margin-top:8px">' + (reg ? 'Ik heb al een account' : 'Nieuw account maken') + '</button></form>');
 }
 function authMsg(e) {
   const m = String((e && e.message) || '');
@@ -593,6 +596,11 @@ function authMsg(e) {
   if (/password/i.test(m)) return 'Kies een sterker wachtwoord (minstens 6 tekens).';
   if (/fetch|network/i.test(m)) return 'Geen verbinding. Controleer je internet en probeer opnieuw.';
   return 'Dat lukte niet. ' + m;
+}
+function showRecovery() {
+  authShell('<h1>Nieuw wachtwoord</h1><p>Kies een nieuw wachtwoord voor je account.</p>' +
+    '<label><span class="lbl">Nieuw wachtwoord</span><input id="np-1" type="password" autocomplete="new-password"></label>' +
+    '<div class="hint" id="np-msg"></div><button class="primary" type="button" data-auth="newpass" style="width:100%;margin-top:12px">Wachtwoord opslaan</button>');
 }
 async function doAuth() {
   const reg = S.authMode === 'up';
@@ -688,9 +696,12 @@ async function boot() {
     return;
   }
   S.sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  S.recovery = /type=recovery/.test(location.hash || '');
+  try { S.sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') { S.recovery = true; showRecovery(); } }); } catch (e) {}
   const wantsForm = location.hash === '#huur';
   try {
     const { data } = await S.sb.auth.getSession();
+    if (S.recovery && data.session) { showRecovery(); return; }
     if (!data.session) { if (wantsForm) showRequest(); else showAuth('in'); return; }
     await afterLogin(data.session.user);
     if (wantsForm) showRequest();
@@ -703,6 +714,22 @@ document.addEventListener('click', async e => {
   const a = e.target.closest('[data-auth]'); if (!a) return;
   const k = a.dataset.auth;
   if (k === 'mode') showAuth(S.authMode === 'up' ? 'in' : 'up');
+  else if (k === 'forgot') {
+    const em = (($('#a-email') || {}).value || '').trim(), m = $('#a-msg');
+    const say = (t, err) => { if (m) { m.textContent = t; m.className = 'hint' + (err ? ' err' : ''); } };
+    if (!/^\S+@\S+\.\S+$/.test(em)) { say('Vul eerst je e-mailadres in en tik dan opnieuw op "Wachtwoord vergeten?".', true); return; }
+    a.disabled = true; say('Even geduld…');
+    try { const r = await S.sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + '/' }); if (r.error) throw r.error; say('Als dit e-mailadres bij ons bekend is, kreeg je een mail met een link om een nieuw wachtwoord te kiezen. Kijk ook in je spam.'); }
+    catch (x) { say(authMsg(x), true); }
+    a.disabled = false;
+  }
+  else if (k === 'newpass') {
+    const p1 = ($('#np-1') || {}).value || '', m = $('#np-msg');
+    if (p1.length < 6) { m.textContent = 'Kies een wachtwoord van minstens 6 tekens.'; m.className = 'hint err'; return; }
+    a.disabled = true; m.textContent = 'Even geduld…'; m.className = 'hint';
+    try { const r = await S.sb.auth.updateUser({ password: p1 }); if (r.error) throw r.error; S.recovery = false; try { history.replaceState(null, '', location.pathname); } catch (x) {} location.reload(); }
+    catch (x) { a.disabled = false; m.textContent = authMsg(x); m.className = 'hint err'; }
+  }
   else if (k === 'logout') { try { await S.sb.auth.signOut(); } catch (x) {} location.reload(); }
   else if (k === 'recheck') { const bt = $('[data-auth=recheck]'); if (bt) { bt.disabled = true; bt.textContent = 'Even kijken…'; } try { const { data } = await S.sb.auth.getSession(); if (data.session) { await afterLogin(data.session.user); if (S.role === 'pending') toast('Nog niet goedgekeurd. Gecontroleerd om ' + new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' }) + '.'); } else location.reload(); } catch (x) { location.reload(); } }
 });
@@ -1255,9 +1282,14 @@ function agendaView() {
     '<div class="sec">Komende reserveringen & plannen</div>' +
     (up.length ? up.map(b => evHTML({ type: 'b', kind: b.kind, title: b.title, color: (KINDS[b.kind] || KINDS.plan).color, ref: b })).join('') : '<div class="hint" style="margin:0 0 6px 2px">Nog niets in de agenda.</div>') + '</div>';
 }
+function cellWho(ev) {
+  const b = ev.find(e => e.type === 'b' && e.ref.by); if (!b) return '';
+  const n = (nameOf(b.ref.by) || '').split(/\s+/)[0]; if (!n || n === 'iemand') return '';
+  return '<span class="who" style="color:' + b.color + '">' + esc(n) + '</span>';
+}
 function cellHTML(ds, d, out) {
   const ev = eventsOn(ds), bars = ev.slice(0, 3).map(e => '<div class="bar" style="--c:' + e.color + '"></div>').join('');
-  return '<button class="cell' + (out ? ' out' : '') + (ds === todayStr() ? ' today' : '') + (ds === S.cal.sel ? ' sel' : '') + '" data-act="selday" data-d="' + esc(ds) + '"><span class="dn">' + d + '</span>' + bars + (ev.length > 3 ? '<span class="more">+' + (ev.length - 3) + '</span>' : '') + '</button>';
+  return '<button class="cell' + (out ? ' out' : '') + (ds === todayStr() ? ' today' : '') + (ds === S.cal.sel ? ' sel' : '') + '" data-act="selday" data-d="' + esc(ds) + '"><span class="dn">' + d + '</span>' + bars + (ev.length > 3 ? '<span class="more">+' + (ev.length - 3) + '</span>' : '') + cellWho(ev) + '</button>';
 }
 function evHTML(e) {
   const r = e.ref, isB = e.type === 'b';
@@ -2058,7 +2090,7 @@ async function pushOff() {
 }
 function openFromPush(tab) {
   if (!S.db) return;
-  if (tab === 'requests') { S.reqTab = 'req'; goTab('agenda'); } else if (tab === 'settings' && S.canAdmin) openSettings();
+  if (tab === 'requests') { S.reqTab = 'req'; goTab('agenda'); } else if (tab === 'agenda') { S.reqTab = 'cal'; goTab('agenda'); } else if (tab === 'settings' && S.canAdmin) openSettings();
 }
 try { if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && 'cdTab' in e.data) openFromPush(e.data.cdTab); }); } catch (e) {}
 async function changeRole(uid, role) {
@@ -2284,6 +2316,15 @@ function openDecision(id, approve) {
     (cf.length ? '<div class="warn"><b>Let op, dit overlapt:</b><br>' + cf.map(b => esc(b.title) + ' (' + esc(fmtRange(b.start, b.end)) + ')').join('<br>') + '</div>' : '') +
     '<div class="actions"><button class="ghost" data-act="close">Annuleer</button><button class="' + (approve ? 'primary' : 'danger') + '" data-act="rqdo" data-id="' + esc(id) + '" data-ok="' + (approve ? '1' : '0') + '">' + (approve ? (cf.length ? 'Toch goedkeuren' : 'Goedkeuren') : 'Afwijzen') + '</button></div>', 'rqconfirm');
 }
+function applicantMsg(r, ok) {
+  const first = String(r.name || '').split(/\s+/)[0], per = fmtRange(r.start_date, r.end_date);
+  const txt = ok ? 'Dag ' + first + ', je aanvraag voor Camper Danny (' + per + ') is goedgekeurd. Tot dan!' : 'Dag ' + first + ', helaas kan de camper niet in de periode ' + per + '. Wil je een andere periode proberen?';
+  const tel = String(r.phone || '').replace(/[^\d+]/g, ''), wa = tel.replace(/^\+/, '').replace(/^00/, '');
+  openSheet('<h2>Laat ' + esc(first) + ' iets weten</h2><p style="margin:0 0 8px">De aanvrager heeft geen account, dus er gaat geen automatische melding. Stuur zelf een bericht:</p><div class="actions" style="flex-direction:column;align-items:stretch">' +
+    '<a class="btn primary" style="text-align:center" href="mailto:' + esc(r.email) + '?subject=' + encodeURIComponent('Camper Danny: ' + (ok ? 'goedgekeurd' : 'aanvraag')) + '&body=' + encodeURIComponent(txt) + '">Mail sturen</a>' +
+    (/^\+?\d{8,15}$/.test(tel) ? '<a class="btn" style="text-align:center" href="https://wa.me/' + esc(wa) + '?text=' + encodeURIComponent(txt) + '" target="_blank" rel="noopener">WhatsApp sturen</a><a class="btn" style="text-align:center" href="tel:' + esc(tel) + '">Bellen</a>' : '') +
+    '<button class="ghost" data-act="close">Later</button></div>', 'rqdone');
+}
 let rqBusy = false;
 async function decide(id, ok) {
   if (rqBusy) return; rqBusy = true;
@@ -2294,6 +2335,7 @@ async function decide(id, ok) {
     if (!data || !data.ok) toast(k === 'already' ? 'Deze aanvraag is al behandeld.' : k === 'forbidden' ? 'Je hebt hier geen rechten voor.' : 'Dat lukte niet. Probeer opnieuw.');
     else toast(ok ? 'Goedgekeurd en in de agenda gezet ✓' : 'Aanvraag afgewezen');
     closeSheet(); await loadRequests(); if (S.db && S.db.reload) S.db.reload();
+    if (data && data.ok) { const rq = (S.requests || []).find(x => x.id === id); if (rq) applicantMsg(rq, ok); }
   } catch (e) { toast('Dat lukte niet. Controleer je verbinding.'); }
   finally { rqBusy = false; }
 }
