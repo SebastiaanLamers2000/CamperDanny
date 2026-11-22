@@ -77,6 +77,7 @@ nav button.on{color:var(--accent);font-weight:600}
 .mapctl button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .mapcard{position:absolute;left:12px;bottom:84px;right:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;box-shadow:var(--shadow)}
 .mcimg{display:block;width:100%;height:150px;object-fit:cover;border-radius:10px;margin-bottom:8px}
+.mapcard{cursor:pointer}
 .mapcard h3{font-size:16px}
 .mapcard .m{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .mapnote{position:absolute;left:12px;bottom:6px;font-size:10.5px;color:var(--muted);opacity:.9;pointer-events:none}
@@ -1121,17 +1122,17 @@ function drawCard0() {
   const el = $('#mapcard'); if (!el) return;
   const sp = S.selSpot ? S.spots.find(x => x.id === S.selSpot) : null;
   const img = (th, kind, par) => th && th.t ? '<img class="mcimg" alt="" src="' + esc(th.t) + '" data-pid="' + esc(th.id) + '" data-kind="' + kind + '" data-par="' + esc(par) + '">' : '';
-  if (sp) { el.innerHTML = '<div class="mapcard">' + img(sp.thumbs && sp.thumbs[0], 'spots', sp.id) + '<h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
+  if (sp) { el.innerHTML = '<div class="mapcard" role="button" tabindex="0" data-act="spot" data-id="' + esc(sp.id) + '">' + img(sp.thumbs && sp.thumbs[0], 'spots', sp.id) + '<h3><span class="heart">♥</span> ' + esc(sp.title) + '</h3><div class="m">' + esc([sp.place, spotPrice(sp)].filter(Boolean).join(' · ')) + '</div><button class="small" data-act="spot" data-id="' + esc(sp.id) + '">Bekijk spot</button></div>'; return; }
   const t = S.trips.find(x => x.id === S.selTrip);
   if (!t) { el.innerHTML = ''; return; }
   const st = (t.stops || []).filter(x => isFinite(x.lat) && isFinite(x.lon)), stop = S.selStop != null ? st[S.selStop] : null;
   if (stop) {
     const nt = stop.night ? (t.nights || []).find(x => x.id === stop.night) : null, note = nt && nt.notes ? nt.notes.trim() : '';
-    el.innerHTML = '<div class="mapcard">' + img((nt && nt.thumbs && nt.thumbs[0]) || tripThumbs(t)[0], 'trips', t.id) + '<h3>' + esc(nt ? nt.name : String(stop.name).replace(/\s*\(.*\)/, '')) + '</h3><div class="m">' + esc([nt && nt.date ? fmtLong(nt.date) : '', t.title].filter(Boolean).join(' · ')) + '</div>' +
+    el.innerHTML = '<div class="mapcard" role="button" tabindex="0" data-act="detail" data-id="' + esc(t.id) + '">' + img((nt && nt.thumbs && nt.thumbs[0]) || tripThumbs(t)[0], 'trips', t.id) + '<h3>' + esc(nt ? nt.name : String(stop.name).replace(/\s*\(.*\)/, '')) + '</h3><div class="m">' + esc([nt && nt.date ? fmtLong(nt.date) : '', t.title].filter(Boolean).join(' · ')) + '</div>' +
       (note ? '<div class="m" style="color:var(--ink)">' + esc(note.length > 90 ? note.slice(0, 88) + '…' : note) + '</div>' : '') + '<button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
     return;
   }
-  el.innerHTML = '<div class="mapcard"><h3>' + esc(t.title) + '</h3><div class="m">' + esc(fmtRange(t.start, t.end)) + (t.km ? ' · ' + fmtNum(t.km) + ' km' : '') + '</div><button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
+  el.innerHTML = '<div class="mapcard" role="button" tabindex="0" data-act="detail" data-id="' + esc(t.id) + '"><h3>' + esc(t.title) + '</h3><div class="m">' + esc(fmtRange(t.start, t.end)) + (t.km ? ' · ' + fmtNum(t.km) + ' km' : '') + '</div><button class="small" data-act="detail" data-id="' + esc(t.id) + '">Bekijk reis</button></div>';
 }
 
 /* ---------- start ---------- */
