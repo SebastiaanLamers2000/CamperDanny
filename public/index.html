@@ -1104,8 +1104,8 @@ function drawMap() {
   const lab = $('#lab'); if (lab) lab.innerHTML = mapLabels(vb, px, avoid);
   $('#marks').innerHTML = lines + dotsH + clH + hearts + labels + hlabels + van;
 }
-function selectTrip(id, stop) { S.selTrip = id; S.selStop = stop != null && stop !== '' ? +stop : null; S.selSpot = null; drawMap(); drawCard(); }
-function selectSpot(id) { S.selSpot = id; S.selTrip = null; S.selStop = null; drawMap(); drawCard(); }
+function selectTrip(id, stop) { S.cardT = Date.now(); S.selTrip = id; S.selStop = stop != null && stop !== '' ? +stop : null; S.selSpot = null; drawMap(); drawCard(); }
+function selectSpot(id) { S.cardT = Date.now(); S.selSpot = id; S.selTrip = null; S.selStop = null; drawMap(); drawCard(); }
 const PH = new Map();
 // de kaart toont eerst het kleine voorbeeld en vervangt het door de volle foto zodra die binnen is
 async function sharpenCardImg() {
@@ -2381,6 +2381,7 @@ document.addEventListener('keydown', e => { const lb = $('.lightbox'); if (lb &&
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act, id = a.dataset.id;
+  if (a.classList.contains('mapcard') && Date.now() - (S.cardT || 0) < 500) return; // dezelfde tik die het kaartje opende
   if (act === 'scrim') { if (e.target === a) guardClose(closeSheet); return; }
   if (act === 'lightbox') {
     const l = S.photoCache[id]; if (!l) return; const own = l.items.filter(x => !x.night), i = own.findIndex(x => x.id === a.dataset.p); if (i < 0) return;
